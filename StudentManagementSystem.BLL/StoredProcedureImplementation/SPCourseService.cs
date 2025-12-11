@@ -224,6 +224,88 @@ namespace StudentManagementSystem.BLL.StoredProcedureImplementation
             }
         }
 
+         public List<Course> GetAvailablePrerequisiteCourses(int courseId)
+    {
+        var courses = new List<Course>();
+
+        using (var conn = new SqlConnection(_connectionString))
+        {
+            var cmd = new SqlCommand(@"
+                SELECT c.CourseID, c.CourseCode, c.Title, c.Description, c.Credits, c.DepartmentID, d.DepartmentName
+                FROM Courses c
+                INNER JOIN Departments d ON c.DepartmentID = d.DepartmentID
+                WHERE c.CourseID <> @CourseID
+                  AND c.CourseID NOT IN (
+                      SELECT PrerequisiteCourseID 
+                      FROM CoursePrerequisites 
+                      WHERE CourseID = @CourseID
+                  )", conn);
+
+            cmd.Parameters.AddWithValue("@CourseID", courseId);
+            conn.Open();
+
+            using (var reader = cmd.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    courses.Add(MapCourse(reader));
+                }
+            }
+        }
+
+        return courses;
+    }
+
+    // 🔹 NEW: add prerequisite relationship
+    public void AddCoursePrerequisite(int courseId, int prerequisiteCourseId)
+    {
+        if (courseId == prerequisiteCourseId)
+            throw new InvalidOperationException("A course cannot be its own prerequisite.");
+
+        using (var conn = new SqlConnection(_connectionString))
+        {
+            // Optional: check if exists
+            var checkCmd = new SqlCommand(@"
+                SELECT COUNT(1) 
+                FROM CoursePrerequisites 
+                WHERE CourseID = @CourseID AND PrerequisiteCourseID = @PrereqID", conn);
+
+            checkCmd.Parameters.AddWithValue("@CourseID", courseId);
+            checkCmd.Parameters.AddWithValue("@PrereqID", prerequisiteCourseId);
+
+            conn.Open();
+            var exists = (int)checkCmd.ExecuteScalar() > 0;
+
+            if (!exists)
+            {
+                var insertCmd = new SqlCommand(@"
+                    INSERT INTO CoursePrerequisites (CourseID, PrerequisiteCourseID)
+                    VALUES (@CourseID, @PrereqID)", conn);
+
+                insertCmd.Parameters.AddWithValue("@CourseID", courseId);
+                insertCmd.Parameters.AddWithValue("@PrereqID", prerequisiteCourseId);
+                insertCmd.ExecuteNonQuery();
+            }
+        }
+    }
+
+    // 🔹 NEW: remove prerequisite relationship
+    public void RemoveCoursePrerequisite(int courseId, int prerequisiteCourseId)
+    {
+        using (var conn = new SqlConnection(_connectionString))
+        {
+            var cmd = new SqlCommand(@"
+                DELETE FROM CoursePrerequisites
+                WHERE CourseID = @CourseID AND PrerequisiteCourseID = @PrereqID", conn);
+
+            cmd.Parameters.AddWithValue("@CourseID", courseId);
+            cmd.Parameters.AddWithValue("@PrereqID", prerequisiteCourseId);
+
+            conn.Open();
+            cmd.ExecuteNonQuery();
+        }
+    }
+
         private Course MapCourse(IDataReader reader)
         {
             return new Course

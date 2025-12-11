@@ -60,6 +60,59 @@ namespace StudentManagementSystem.UI.Forms
             }
         }
 
+private void LoadPrerequisites(int courseId)
+{
+    try
+    {
+        var prereqs = _courseService.GetCoursePrerequisites(courseId);
+
+        dgvPrerequisites.DataSource = prereqs
+            .Select(cp => new
+            {
+                cp.PrerequisiteCourseID,
+                CourseCode = cp.PrerequisiteCourse.CourseCode,
+                Title = cp.PrerequisiteCourse.Title
+            })
+            .ToList();
+    }
+    catch (Exception ex)
+    {
+        var msg = "Error loading prerequisites: " + ex.Message;
+        if (ex.InnerException != null)
+        {
+            msg += Environment.NewLine + Environment.NewLine +
+                   "Inner exception: " + ex.InnerException.Message;
+        }
+
+        MessageBox.Show(msg, "Error",
+            MessageBoxButtons.OK, MessageBoxIcon.Error);
+    }
+}
+
+
+private void LoadPrerequisiteCandidates(int courseId)
+{
+    try
+    {
+        var candidates = _courseService.GetAvailablePrerequisiteCourses(courseId);
+
+        cmbPrerequisiteCourse.DataSource = candidates;
+        cmbPrerequisiteCourse.DisplayMember = "CourseCode"; // or "Title" if you prefer
+        cmbPrerequisiteCourse.ValueMember = "CourseID";
+
+        if (candidates.Count == 0)
+        {
+            cmbPrerequisiteCourse.Text = string.Empty;
+        }
+    }
+    catch (Exception ex)
+    {
+        MessageBox.Show($"Error loading available prerequisite courses: {ex.Message}", "Error",
+            MessageBoxButtons.OK, MessageBoxIcon.Error);
+    }
+}
+
+
         private void dgvCourses_SelectionChanged(object sender, EventArgs e)
         {
             if (dgvCourses.SelectedRows.Count > 0)
@@ -81,6 +134,8 @@ namespace StudentManagementSystem.UI.Forms
                     txtDescription.Text = course.Description;
                     numCredits.Value = course.Credits;
                     cmbDepartment.SelectedValue = course.DepartmentID;
+                    LoadPrerequisites(courseId);
+                    LoadPrerequisiteCandidates(courseId);
                 }
             }
             catch (Exception ex)
@@ -89,6 +144,87 @@ namespace StudentManagementSystem.UI.Forms
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
+
+        private void btnAddPrerequisite_Click(object sender, EventArgs e)
+{
+    if (!_selectedCourseId.HasValue)
+    {
+        MessageBox.Show("Please select a course first.", "Validation",
+            MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        return;
+    }
+
+    if (cmbPrerequisiteCourse.SelectedItem == null)
+    {
+        MessageBox.Show("Please select a course to add as a prerequisite.", "Validation",
+            MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        return;
+    }
+
+    var courseId = _selectedCourseId.Value;
+    var prereqId = (int)cmbPrerequisiteCourse.SelectedValue;
+
+    if (courseId == prereqId)
+    {
+        MessageBox.Show("A course cannot be its own prerequisite.", "Validation",
+            MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        return;
+    }
+
+    try
+    {
+        _courseService.AddCoursePrerequisite(courseId, prereqId);
+        LoadPrerequisites(courseId);
+        LoadPrerequisiteCandidates(courseId);
+    }
+    catch (Exception ex)
+    {
+        MessageBox.Show($"Error adding prerequisite: {ex.Message}", "Error",
+            MessageBoxButtons.OK, MessageBoxIcon.Error);
+    }
+}
+
+private void btnRemovePrerequisite_Click(object sender, EventArgs e)
+{
+    if (!_selectedCourseId.HasValue)
+    {
+        MessageBox.Show("Please select a course first.", "Validation",
+            MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        return;
+    }
+
+    if (dgvPrerequisites.SelectedRows.Count == 0)
+    {
+        MessageBox.Show("Please select a prerequisite to remove.", "Validation",
+            MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        return;
+    }
+
+    var courseId = _selectedCourseId.Value;
+    var prereqId = (int)dgvPrerequisites.SelectedRows[0].Cells["PrerequisiteCourseID"].Value;
+
+    var confirm = MessageBox.Show(
+        "Are you sure you want to remove this prerequisite?",
+        "Confirm",
+        MessageBoxButtons.YesNo,
+        MessageBoxIcon.Question);
+
+    if (confirm != DialogResult.Yes)
+        return;
+
+    try
+    {
+        _courseService.RemoveCoursePrerequisite(courseId, prereqId);
+        LoadPrerequisites(courseId);
+        LoadPrerequisiteCandidates(courseId);
+    }
+    catch (Exception ex)
+    {
+        MessageBox.Show($"Error removing prerequisite: {ex.Message}", "Error",
+            MessageBoxButtons.OK, MessageBoxIcon.Error);
+    }
+}
+
 
         private void btnAdd_Click(object sender, EventArgs e)
         {
@@ -226,6 +362,9 @@ namespace StudentManagementSystem.UI.Forms
             numCredits.Value = 3;
             if (cmbDepartment.Items.Count > 0)
                 cmbDepartment.SelectedIndex = 0;
+            dgvPrerequisites.DataSource = null;
+            cmbPrerequisiteCourse.DataSource = null;
+            cmbPrerequisiteCourse.Text = string.Empty;
         }
     }
 }

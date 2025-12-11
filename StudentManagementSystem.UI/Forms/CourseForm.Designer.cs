@@ -20,6 +20,13 @@ namespace StudentManagementSystem.UI.Forms
         private System.Windows.Forms.Label lblDepartment;
         private System.Windows.Forms.GroupBox grpCourseDetails;
         private System.Windows.Forms.GroupBox grpCourseList;
+        private System.Windows.Forms.GroupBox grpPrerequisites;
+        private System.Windows.Forms.DataGridView dgvPrerequisites;
+        private System.Windows.Forms.ComboBox cmbPrerequisiteCourse;
+        private System.Windows.Forms.Button btnAddPrerequisite;
+        private System.Windows.Forms.Button btnRemovePrerequisite;
+        private System.Windows.Forms.Label lblPrerequisiteList;
+        private System.Windows.Forms.Label lblAddPrerequisite;
 
         protected override void Dispose(bool disposing)
         {
@@ -97,6 +104,107 @@ namespace StudentManagementSystem.UI.Forms
             this.grpCourseDetails.TabIndex = 1;
             this.grpCourseDetails.TabStop = false;
             this.grpCourseDetails.Text = "Course Details";
+            // 
+            // grpPrerequisites
+            // 
+            this.grpPrerequisites = new System.Windows.Forms.GroupBox();
+            this.dgvPrerequisites = new System.Windows.Forms.DataGridView();
+            this.cmbPrerequisiteCourse = new System.Windows.Forms.ComboBox();
+            this.btnAddPrerequisite = new System.Windows.Forms.Button();
+            this.btnRemovePrerequisite = new System.Windows.Forms.Button();
+            this.lblPrerequisiteList = new System.Windows.Forms.Label();
+            this.lblAddPrerequisite = new System.Windows.Forms.Label();
+
+            this.grpPrerequisites.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.dgvPrerequisites)).BeginInit();
+
+            // 
+            // grpPrerequisites
+            // 
+            this.grpPrerequisites.Controls.Add(this.lblPrerequisiteList);
+            this.grpPrerequisites.Controls.Add(this.dgvPrerequisites);
+            this.grpPrerequisites.Controls.Add(this.lblAddPrerequisite);
+            this.grpPrerequisites.Controls.Add(this.cmbPrerequisiteCourse);
+            this.grpPrerequisites.Controls.Add(this.btnAddPrerequisite);
+            this.grpPrerequisites.Controls.Add(this.btnRemovePrerequisite);
+            this.grpPrerequisites.Location = new System.Drawing.Point(12, 440);
+            this.grpPrerequisites.Name = "grpPrerequisites";
+            this.grpPrerequisites.Size = new System.Drawing.Size(760, 170);
+            this.grpPrerequisites.TabIndex = 2;
+            this.grpPrerequisites.TabStop = false;
+            this.grpPrerequisites.Text = "Prerequisites";
+
+            // 
+            // lblPrerequisiteList
+            // 
+            this.lblPrerequisiteList.AutoSize = true;
+            this.lblPrerequisiteList.Location = new System.Drawing.Point(15, 25);
+            this.lblPrerequisiteList.Name = "lblPrerequisiteList";
+            this.lblPrerequisiteList.Size = new System.Drawing.Size(106, 13);
+            this.lblPrerequisiteList.TabIndex = 0;
+            this.lblPrerequisiteList.Text = "Existing prerequisites";
+
+            // 
+            // dgvPrerequisites
+            // 
+            this.dgvPrerequisites.AllowUserToAddRows = false;
+            this.dgvPrerequisites.AllowUserToDeleteRows = false;
+            this.dgvPrerequisites.AutoSizeColumnsMode = System.Windows.Forms.DataGridViewAutoSizeColumnsMode.Fill;
+            this.dgvPrerequisites.Location = new System.Drawing.Point(15, 45);
+            this.dgvPrerequisites.MultiSelect = false;
+            this.dgvPrerequisites.Name = "dgvPrerequisites";
+            this.dgvPrerequisites.ReadOnly = true;
+            this.dgvPrerequisites.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect;
+            this.dgvPrerequisites.Size = new System.Drawing.Size(430, 110);
+            this.dgvPrerequisites.TabIndex = 1;
+
+            // 
+            // lblAddPrerequisite
+            // 
+            this.lblAddPrerequisite.AutoSize = true;
+            this.lblAddPrerequisite.Location = new System.Drawing.Point(465, 25);
+            this.lblAddPrerequisite.Name = "lblAddPrerequisite";
+            this.lblAddPrerequisite.Size = new System.Drawing.Size(88, 13);
+            this.lblAddPrerequisite.TabIndex = 2;
+            this.lblAddPrerequisite.Text = "Add prerequisite:";
+
+            // 
+            // cmbPrerequisiteCourse
+            // 
+            this.cmbPrerequisiteCourse.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.cmbPrerequisiteCourse.FormattingEnabled = true;
+            this.cmbPrerequisiteCourse.Location = new System.Drawing.Point(468, 45);
+            this.cmbPrerequisiteCourse.Name = "cmbPrerequisiteCourse";
+            this.cmbPrerequisiteCourse.Size = new System.Drawing.Size(270, 21);
+            this.cmbPrerequisiteCourse.TabIndex = 3;
+
+            // 
+            // btnAddPrerequisite
+            // 
+            this.btnAddPrerequisite.BackColor = System.Drawing.Color.Honeydew;
+            this.btnAddPrerequisite.Location = new System.Drawing.Point(468, 80);
+            this.btnAddPrerequisite.Name = "btnAddPrerequisite";
+            this.btnAddPrerequisite.Size = new System.Drawing.Size(120, 30);
+            this.btnAddPrerequisite.TabIndex = 4;
+            this.btnAddPrerequisite.Text = "Add";
+            this.btnAddPrerequisite.UseVisualStyleBackColor = false;
+            this.btnAddPrerequisite.Click += new System.EventHandler(this.btnAddPrerequisite_Click);
+
+            // 
+            // btnRemovePrerequisite
+            // 
+            this.btnRemovePrerequisite.BackColor = System.Drawing.Color.MistyRose;
+            this.btnRemovePrerequisite.Location = new System.Drawing.Point(618, 80);
+            this.btnRemovePrerequisite.Name = "btnRemovePrerequisite";
+            this.btnRemovePrerequisite.Size = new System.Drawing.Size(120, 30);
+            this.btnRemovePrerequisite.TabIndex = 5;
+            this.btnRemovePrerequisite.Text = "Remove selected";
+            this.btnRemovePrerequisite.UseVisualStyleBackColor = false;
+            this.btnRemovePrerequisite.Click += new System.EventHandler(this.btnRemovePrerequisite_Click);
+
+            ((System.ComponentModel.ISupportInitialize)(this.dgvPrerequisites)).EndInit();
+            this.grpPrerequisites.ResumeLayout(false);
+            this.grpPrerequisites.PerformLayout();
             // 
             // lblCourseCode
             // 
@@ -231,15 +339,27 @@ namespace StudentManagementSystem.UI.Forms
             // 
             // CourseForm
             // 
+            // CourseForm
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(784, 491);
+
+            // increase height for new group
+            this.ClientSize = new System.Drawing.Size(784, 661);
+
+            this.Controls.Add(this.grpPrerequisites);
             this.Controls.Add(this.btnClose);
             this.Controls.Add(this.btnDelete);
             this.Controls.Add(this.btnUpdate);
             this.Controls.Add(this.btnAdd);
             this.Controls.Add(this.grpCourseDetails);
             this.Controls.Add(this.grpCourseList);
+
+            // move buttons down below prereq group
+            this.btnAdd.Location = new System.Drawing.Point(100, 630);
+            this.btnUpdate.Location = new System.Drawing.Point(250, 630);
+            this.btnDelete.Location = new System.Drawing.Point(400, 630);
+            this.btnClose.Location = new System.Drawing.Point(550, 630);
+            
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.Name = "CourseForm";

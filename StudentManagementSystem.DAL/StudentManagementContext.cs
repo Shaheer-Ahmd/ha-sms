@@ -54,19 +54,12 @@ namespace StudentManagementSystem.DAL
                 .HasForeignKey(c => c.DepartmentID)
                 .WillCascadeOnDelete(false);
 
-            // CoursePrerequisite - Composite Key
             modelBuilder.Entity<CoursePrerequisite>()
-                .HasKey(cp => new { cp.CourseID, cp.PrerequisiteCourseID });
-
-            modelBuilder.Entity<CoursePrerequisite>()
-                .HasRequired(cp => cp.Course)
-                .WithMany(c => c.Prerequisites)
-                .HasForeignKey(cp => cp.CourseID)
-                .WillCascadeOnDelete(false);
+                    .HasKey(cp => new { cp.CourseID, cp.PrerequisiteCourseID });
 
             modelBuilder.Entity<CoursePrerequisite>()
                 .HasRequired(cp => cp.PrerequisiteCourse)
-                .WithMany()
+                .WithMany()                 // we don't need a collection on Course for now
                 .HasForeignKey(cp => cp.PrerequisiteCourseID)
                 .WillCascadeOnDelete(false);
 

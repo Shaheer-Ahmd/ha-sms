@@ -132,5 +132,59 @@ namespace StudentManagementSystem.BLL.LinqImplementation
                 return result;
             }
         }
+        public List<Course> GetAvailablePrerequisiteCourses(int courseId)
+    {
+        using (var context = new StudentManagementContext(_connectionString))
+        {
+            var existingPrereqIds = context.CoursePrerequisites
+                .Where(cp => cp.CourseID == courseId)
+                .Select(cp => cp.PrerequisiteCourseID)
+                .ToList();
+
+            // Exclude the course itself + already-added prerequisites
+            return context.Courses
+                .Where(c => c.CourseID != courseId && !existingPrereqIds.Contains(c.CourseID))
+                .OrderBy(c => c.CourseCode)
+                .ToList();
+        }
+    }
+
+    public void AddCoursePrerequisite(int courseId, int prerequisiteCourseId)
+    {
+        using (var context = new StudentManagementContext(_connectionString))
+        {
+            if (courseId == prerequisiteCourseId)
+                throw new InvalidOperationException("A course cannot be its own prerequisite.");
+
+            var exists = context.CoursePrerequisites.Any(cp =>
+                cp.CourseID == courseId && cp.PrerequisiteCourseID == prerequisiteCourseId);
+
+            if (!exists)
+            {
+                var entity = new CoursePrerequisite
+                {
+                    CourseID = courseId,
+                    PrerequisiteCourseID = prerequisiteCourseId
+                };
+                context.CoursePrerequisites.Add(entity);
+                context.SaveChanges();
+            }
+        }
+    }
+
+    public void RemoveCoursePrerequisite(int courseId, int prerequisiteCourseId)
+    {
+        using (var context = new StudentManagementContext(_connectionString))
+        {
+            var entity = context.CoursePrerequisites.SingleOrDefault(cp =>
+                cp.CourseID == courseId && cp.PrerequisiteCourseID == prerequisiteCourseId);
+
+            if (entity != null)
+            {
+                context.CoursePrerequisites.Remove(entity);
+                context.SaveChanges();
+            }
+        }
+    }
     }
 }

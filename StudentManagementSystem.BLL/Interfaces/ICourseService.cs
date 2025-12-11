@@ -18,5 +18,8 @@ namespace StudentManagementSystem.BLL.Interfaces
         List<Course> GetCoursesByDepartment(int departmentId);
         List<CoursePrerequisite> GetCoursePrerequisites(int courseId);
         bool CheckPrerequisitesMet(int studentId, int courseId); // Uses fn_CheckPrerequisitesMet
+        void AddCoursePrerequisite(int courseId, int prerequisiteCourseId);
+        void RemoveCoursePrerequisite(int courseId, int prerequisiteCourseId);
+        List<Course> GetAvailablePrerequisiteCourses(int courseId);
     }
 }

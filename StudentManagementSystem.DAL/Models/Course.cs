@@ -32,14 +32,10 @@ namespace StudentManagementSystem.DAL.Models
         public virtual Department Department { get; set; }
 
         public virtual ICollection<CourseOffering> CourseOfferings { get; set; }
-        public virtual ICollection<CoursePrerequisite> Prerequisites { get; set; }
-        public virtual ICollection<CoursePrerequisite> DependentCourses { get; set; }
 
         public Course()
         {
             CourseOfferings = new HashSet<CourseOffering>();
-            Prerequisites = new HashSet<CoursePrerequisite>();
-            DependentCourses = new HashSet<CoursePrerequisite>();
         }
     }
 }
