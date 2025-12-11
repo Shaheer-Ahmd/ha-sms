@@ -1,6 +1,6 @@
 using System;
-using System.Configuration;
 using System.Windows.Forms;
+using Microsoft.Extensions.Configuration;
 using StudentManagementSystem.BLL.Factory;
 using StudentManagementSystem.BLL.Interfaces;
 
@@ -10,16 +10,26 @@ namespace StudentManagementSystem.UI.Forms
     {
         private IBusinessLogicFactory _bllFactory;
         private BLLImplementationType _currentImplementation;
+        private IConfiguration _configuration;
 
         public MainForm()
         {
             InitializeComponent();
+            InitializeConfiguration();
             InitializeBLL();
+        }
+
+        private void InitializeConfiguration()
+        {
+            var builder = new ConfigurationBuilder()
+                .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
+            
+            _configuration = builder.Build();
         }
 
         private void InitializeBLL()
         {
-            string bllType = ConfigurationManager.AppSettings["BLLImplementation"];
+            string bllType = _configuration["AppSettings:BLLImplementation"] ?? "LINQ";
             _currentImplementation = bllType == "StoredProcedure" 
                 ? BLLImplementationType.StoredProcedure 
                 : BLLImplementationType.LINQ;

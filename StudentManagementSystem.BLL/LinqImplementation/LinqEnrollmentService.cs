@@ -1,7 +1,8 @@
 using System;
 using System.Collections.Generic;
-using System.Data.Entity;
+using Microsoft.EntityFrameworkCore;
 using System.Linq;
+using Microsoft.Data.SqlClient;
 using StudentManagementSystem.BLL.Interfaces;
 using StudentManagementSystem.DAL;
 using StudentManagementSystem.DAL.Models;
@@ -54,8 +55,8 @@ namespace StudentManagementSystem.BLL.LinqImplementation
         {
             using (var context = new StudentManagementContext(_connectionString))
             {
-                context.Database.ExecuteSqlCommand(
-                    "EXEC sp_RegisterStudentForCourse @p0, @p1",
+                context.Database.ExecuteSqlRaw(
+                    "EXEC sp_RegisterStudentForCourse {0}, {1}",
                     studentId, offeringId
                 );
             }
@@ -156,7 +157,7 @@ namespace StudentManagementSystem.BLL.LinqImplementation
 
         public void DeleteCourseOffering(int offeringId)
         {
-            using (var conn = new System.Data.SqlClient.SqlConnection(_connectionString))
+            using (var conn = new SqlConnection(_connectionString))
             {
                 conn.Open();
                 using (var cmd = conn.CreateCommand())

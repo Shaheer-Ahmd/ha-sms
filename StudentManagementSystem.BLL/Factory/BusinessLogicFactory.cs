@@ -1,5 +1,5 @@
 using System;
-using System.Configuration;
+using Microsoft.Extensions.Configuration;
 using StudentManagementSystem.BLL.Interfaces;
 using StudentManagementSystem.BLL.LinqImplementation;
 using StudentManagementSystem.BLL.StoredProcedureImplementation;
@@ -11,14 +11,40 @@ namespace StudentManagementSystem.BLL.Factory
         private readonly BLLImplementationType _implementationType;
         private readonly string _connectionString;
 
-        public BusinessLogicFactory(BLLImplementationType implementationType)
+        public BusinessLogicFactory(BLLImplementationType implementationType, string connectionString = null)
         {
             _implementationType = implementationType;
-            _connectionString = ConfigurationManager.ConnectionStrings["StudentManagementDB"]?.ConnectionString;
             
+            if (!string.IsNullOrEmpty(connectionString))
+            {
+                _connectionString = connectionString;
+            }
+            else
+            {
+                // Try to get from configuration
+                _connectionString = GetConnectionString();
+            }
+
             if (string.IsNullOrEmpty(_connectionString))
             {
                 throw new InvalidOperationException("Connection string 'StudentManagementDB' not found in configuration.");
+            }
+        }
+
+        private static string GetConnectionString()
+        {
+            try
+            {
+                var builder = new ConfigurationBuilder()
+                    .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true);
+                
+                var config = builder.Build();
+                return config?.GetConnectionString("StudentManagementDB");
+            }
+            catch
+            {
+                // If configuration file is not available, use default
+                return "Server=localhost,1433;Database=StudentManagementDB;User Id=sa;Password=YourStrong!Passw0rd;TrustServerCertificate=True;";
             }
         }
 

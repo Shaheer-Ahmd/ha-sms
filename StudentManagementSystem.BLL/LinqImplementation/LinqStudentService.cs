@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
-using System.Data.Entity;
-using System.Data.SqlClient;
 using System.Linq;
+using Microsoft.Data.SqlClient;
+using Microsoft.EntityFrameworkCore;
 using StudentManagementSystem.BLL.Interfaces;
 using StudentManagementSystem.DAL;
 using StudentManagementSystem.DAL.Models;
@@ -113,8 +113,9 @@ namespace StudentManagementSystem.BLL.LinqImplementation
         {
             using (var context = new StudentManagementContext(_connectionString))
             {
-                var sql = "SELECT dbo.fn_CalculateGPA(@p0) AS GPA";
-                var result = context.Database.SqlQuery<decimal?>(sql, studentId).FirstOrDefault();
+                var result = context.Database
+                    .SqlQueryRaw<decimal?>("SELECT dbo.fn_CalculateGPA({0})", studentId)
+                    .FirstOrDefault();
                 return result;
             }
         }

@@ -152,7 +152,7 @@ namespace StudentManagementSystem.UI.Forms
                 // Uses sp_RegisterStudentForCourse stored procedure
                 _enrollmentService.RegisterStudentForCourse(studentId, offeringId);
                 
-                MessageBox.Show("Student registered successfully! (Used sp_RegisterStudentForCourse)", 
+                MessageBox.Show("Student registered successfully!", 
                     "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 
                 LoadAvailableOfferings((int)cmbSemester.SelectedValue);

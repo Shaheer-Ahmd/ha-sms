@@ -1,110 +1,120 @@
 using System;
-using System.Data.Entity;
-using System.Data.Entity.ModelConfiguration.Conventions;
+using Microsoft.EntityFrameworkCore;
 using StudentManagementSystem.DAL.Models;
 
 namespace StudentManagementSystem.DAL
 {
     public class StudentManagementContext : DbContext
     {
-        public StudentManagementContext() : base("name=StudentManagementDB")
+        private string? _connectionString;
+
+        public StudentManagementContext() { }
+
+        public StudentManagementContext(DbContextOptions<StudentManagementContext> options) 
+            : base(options)
         {
-            // Disable lazy loading for better control
-            Configuration.LazyLoadingEnabled = false;
-            Configuration.ProxyCreationEnabled = false;
         }
 
-        public StudentManagementContext(string connectionString) : base(connectionString)
+        public StudentManagementContext(string connectionString)
         {
-            Configuration.LazyLoadingEnabled = false;
-            Configuration.ProxyCreationEnabled = false;
+            _connectionString = connectionString;
         }
 
         // DbSets for all entities
-        public virtual DbSet<Department> Departments { get; set; }
-        public virtual DbSet<Student> Students { get; set; }
-        public virtual DbSet<Semester> Semesters { get; set; }
-        public virtual DbSet<Course> Courses { get; set; }
-        public virtual DbSet<CoursePrerequisite> CoursePrerequisites { get; set; }
-        public virtual DbSet<CourseOffering> CourseOfferings { get; set; }
-        public virtual DbSet<Enrollment> Enrollments { get; set; }
-        public virtual DbSet<StudentHold> StudentHolds { get; set; }
-        public virtual DbSet<AuditGradeChange> AuditGradeChanges { get; set; }
+        public virtual DbSet<Department> Departments { get; set; } = null!;
+        public virtual DbSet<Student> Students { get; set; } = null!;
+        public virtual DbSet<Semester> Semesters { get; set; } = null!;
+        public virtual DbSet<Course> Courses { get; set; } = null!;
+        public virtual DbSet<CoursePrerequisite> CoursePrerequisites { get; set; } = null!;
+        public virtual DbSet<CourseOffering> CourseOfferings { get; set; } = null!;
+        public virtual DbSet<Enrollment> Enrollments { get; set; } = null!;
+        public virtual DbSet<StudentHold> StudentHolds { get; set; } = null!;
+        public virtual DbSet<AuditGradeChange> AuditGradeChanges { get; set; } = null!;
 
         // Views
-        public virtual DbSet<StudentTranscript> StudentTranscripts { get; set; }
+        public virtual DbSet<StudentTranscript> StudentTranscripts { get; set; } = null!;
 
-        protected override void OnModelCreating(DbModelBuilder modelBuilder)
+        protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+        {
+            if (!optionsBuilder.IsConfigured)
+            {
+                var connectionString = _connectionString ?? "Server=localhost,1433;Database=StudentManagementDB;User Id=sa;Password=YourStrong!Passw0rd;TrustServerCertificate=True;";
+                optionsBuilder.UseSqlServer(connectionString);
+            }
+        }
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
 
-            // Remove pluralizing convention
-            modelBuilder.Conventions.Remove<PluralizingTableNameConvention>();
-
             // Department - Self-referencing
             modelBuilder.Entity<Department>()
-                .HasOptional(d => d.ParentDepartment)
+                .HasOne(d => d.ParentDepartment)
                 .WithMany(d => d.ChildDepartments)
-                .HasForeignKey(d => d.ParentDepartmentID);
+                .HasForeignKey(d => d.ParentDepartmentID)
+                .IsRequired(false)
+                .OnDelete(DeleteBehavior.Restrict);
 
             // Course - Department
             modelBuilder.Entity<Course>()
-                .HasRequired(c => c.Department)
+                .HasOne(c => c.Department)
                 .WithMany(d => d.Courses)
                 .HasForeignKey(c => c.DepartmentID)
-                .WillCascadeOnDelete(false);
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // CoursePrerequisite
+            modelBuilder.Entity<CoursePrerequisite>()
+                .HasKey(cp => new { cp.CourseID, cp.PrerequisiteCourseID });
 
             modelBuilder.Entity<CoursePrerequisite>()
-                    .HasKey(cp => new { cp.CourseID, cp.PrerequisiteCourseID });
-
-            modelBuilder.Entity<CoursePrerequisite>()
-                .HasRequired(cp => cp.PrerequisiteCourse)
-                .WithMany()                 // we don't need a collection on Course for now
+                .HasOne(cp => cp.PrerequisiteCourse)
+                .WithMany()
                 .HasForeignKey(cp => cp.PrerequisiteCourseID)
-                .WillCascadeOnDelete(false);
+                .OnDelete(DeleteBehavior.Restrict);
 
             // CourseOffering - Course and Semester
             modelBuilder.Entity<CourseOffering>()
-                .HasRequired(co => co.Course)
+                .HasOne(co => co.Course)
                 .WithMany(c => c.CourseOfferings)
                 .HasForeignKey(co => co.CourseID)
-                .WillCascadeOnDelete(false);
+                .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<CourseOffering>()
-                .HasRequired(co => co.Semester)
+                .HasOne(co => co.Semester)
                 .WithMany(s => s.CourseOfferings)
                 .HasForeignKey(co => co.SemesterID)
-                .WillCascadeOnDelete(false);
+                .OnDelete(DeleteBehavior.Restrict);
 
-            // Enrollment - Composite Key for partitioned table
+            // Enrollment - Composite Key
             modelBuilder.Entity<Enrollment>()
                 .HasKey(e => new { e.EnrollmentID, e.EnrollmentDate });
 
             modelBuilder.Entity<Enrollment>()
-                .HasRequired(e => e.Student)
+                .HasOne(e => e.Student)
                 .WithMany(s => s.Enrollments)
                 .HasForeignKey(e => e.StudentID)
-                .WillCascadeOnDelete(false);
+                .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<Enrollment>()
-                .HasRequired(e => e.CourseOffering)
+                .HasOne(e => e.CourseOffering)
                 .WithMany(co => co.Enrollments)
                 .HasForeignKey(e => e.OfferingID)
-                .WillCascadeOnDelete(false);
+                .OnDelete(DeleteBehavior.Restrict);
 
             // StudentHold
             modelBuilder.Entity<StudentHold>()
-                .HasRequired(sh => sh.Student)
+                .HasOne(sh => sh.Student)
                 .WithMany(s => s.StudentHolds)
                 .HasForeignKey(sh => sh.StudentID)
-                .WillCascadeOnDelete(false);
+                .OnDelete(DeleteBehavior.Restrict);
 
-            // AuditGradeChange - Composite Key for partitioned table
+            // AuditGradeChange - Composite Key
             modelBuilder.Entity<AuditGradeChange>()
                 .HasKey(ag => new { ag.AuditID, ag.ChangeDate });
 
-            // StudentTranscript is a view - no key needed, read-only
+            // StudentTranscript is a view - configure as view
             modelBuilder.Entity<StudentTranscript>()
+                .ToView("StudentTranscript")
                 .HasKey(st => new { st.StudentID, st.CourseCode, st.Year, st.Season });
         }
     }

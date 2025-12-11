@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Data.SqlClient;
+using Microsoft.Data.SqlClient;
 using StudentManagementSystem.BLL.Interfaces;
 using StudentManagementSystem.DAL.Models;
 

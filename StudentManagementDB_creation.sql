@@ -822,13 +822,13 @@ BEGIN
         RETURN;
 
     INSERT INTO dbo.Audit_GradeChanges
-        (EnrollmentID, EnrollmentDate, OldGrade, NewGrade, ChangedByLogin)
+        (EnrollmentID, EnrollmentDate, OldGrade, NewGrade, ChangedByAdminID)
     SELECT
         i.EnrollmentID,
         i.EnrollmentDate,
         d.Grade AS OldGrade,
         i.Grade AS NewGrade,
-        SYSTEM_USER
+        1  -- System admin ID
     FROM inserted AS i
     JOIN deleted  AS d
         ON i.EnrollmentID   = d.EnrollmentID

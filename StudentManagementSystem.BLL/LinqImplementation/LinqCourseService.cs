@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
-using System.Data.Entity;
-using System.Data.SqlClient;
 using System.Linq;
+using Microsoft.Data.SqlClient;
+using Microsoft.EntityFrameworkCore;
 using StudentManagementSystem.BLL.Interfaces;
 using StudentManagementSystem.DAL;
 using StudentManagementSystem.DAL.Models;
@@ -74,7 +74,7 @@ namespace StudentManagementSystem.BLL.LinqImplementation
 
         public void DeleteCourse(int courseId)
         {
-            using (var conn = new System.Data.SqlClient.SqlConnection(_connectionString))
+            using (var conn = new SqlConnection(_connectionString))
             {
                 conn.Open();
                 using (var cmd = conn.CreateCommand())
@@ -127,64 +127,66 @@ namespace StudentManagementSystem.BLL.LinqImplementation
         {
             using (var context = new StudentManagementContext(_connectionString))
             {
-                var sql = "SELECT dbo.fn_CheckPrerequisitesMet(@p0, @p1) AS Result";
-                var result = context.Database.SqlQuery<bool>(sql, studentId, courseId).FirstOrDefault();
+                var result = context.Database
+                    .SqlQueryRaw<bool>("SELECT dbo.fn_CheckPrerequisitesMet({0}, {1})", studentId, courseId)
+                    .FirstOrDefault();
                 return result;
             }
         }
+
         public List<Course> GetAvailablePrerequisiteCourses(int courseId)
-    {
-        using (var context = new StudentManagementContext(_connectionString))
         {
-            var existingPrereqIds = context.CoursePrerequisites
-                .Where(cp => cp.CourseID == courseId)
-                .Select(cp => cp.PrerequisiteCourseID)
-                .ToList();
-
-            // Exclude the course itself + already-added prerequisites
-            return context.Courses
-                .Where(c => c.CourseID != courseId && !existingPrereqIds.Contains(c.CourseID))
-                .OrderBy(c => c.CourseCode)
-                .ToList();
-        }
-    }
-
-    public void AddCoursePrerequisite(int courseId, int prerequisiteCourseId)
-    {
-        using (var context = new StudentManagementContext(_connectionString))
-        {
-            if (courseId == prerequisiteCourseId)
-                throw new InvalidOperationException("A course cannot be its own prerequisite.");
-
-            var exists = context.CoursePrerequisites.Any(cp =>
-                cp.CourseID == courseId && cp.PrerequisiteCourseID == prerequisiteCourseId);
-
-            if (!exists)
+            using (var context = new StudentManagementContext(_connectionString))
             {
-                var entity = new CoursePrerequisite
+                var existingPrereqIds = context.CoursePrerequisites
+                    .Where(cp => cp.CourseID == courseId)
+                    .Select(cp => cp.PrerequisiteCourseID)
+                    .ToList();
+
+                // Exclude the course itself + already-added prerequisites
+                return context.Courses
+                    .Where(c => c.CourseID != courseId && !existingPrereqIds.Contains(c.CourseID))
+                    .OrderBy(c => c.CourseCode)
+                    .ToList();
+            }
+        }
+
+        public void AddCoursePrerequisite(int courseId, int prerequisiteCourseId)
+        {
+            using (var context = new StudentManagementContext(_connectionString))
+            {
+                if (courseId == prerequisiteCourseId)
+                    throw new InvalidOperationException("A course cannot be its own prerequisite.");
+
+                var exists = context.CoursePrerequisites.Any(cp =>
+                    cp.CourseID == courseId && cp.PrerequisiteCourseID == prerequisiteCourseId);
+
+                if (!exists)
                 {
-                    CourseID = courseId,
-                    PrerequisiteCourseID = prerequisiteCourseId
-                };
-                context.CoursePrerequisites.Add(entity);
-                context.SaveChanges();
+                    var entity = new CoursePrerequisite
+                    {
+                        CourseID = courseId,
+                        PrerequisiteCourseID = prerequisiteCourseId
+                    };
+                    context.CoursePrerequisites.Add(entity);
+                    context.SaveChanges();
+                }
             }
         }
-    }
 
-    public void RemoveCoursePrerequisite(int courseId, int prerequisiteCourseId)
-    {
-        using (var context = new StudentManagementContext(_connectionString))
+        public void RemoveCoursePrerequisite(int courseId, int prerequisiteCourseId)
         {
-            var entity = context.CoursePrerequisites.SingleOrDefault(cp =>
-                cp.CourseID == courseId && cp.PrerequisiteCourseID == prerequisiteCourseId);
-
-            if (entity != null)
+            using (var context = new StudentManagementContext(_connectionString))
             {
-                context.CoursePrerequisites.Remove(entity);
-                context.SaveChanges();
+                var entity = context.CoursePrerequisites.SingleOrDefault(cp =>
+                    cp.CourseID == courseId && cp.PrerequisiteCourseID == prerequisiteCourseId);
+
+                if (entity != null)
+                {
+                    context.CoursePrerequisites.Remove(entity);
+                    context.SaveChanges();
+                }
             }
         }
-    }
     }
 }

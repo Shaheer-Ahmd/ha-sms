@@ -1,9 +1,8 @@
 using System.Collections.Generic;
 using System.Data;
-using System.Data.Common;
-using System.Data.Entity;
-using System.Data.SqlClient;
 using System.Linq;
+using Microsoft.Data.SqlClient;
+using Microsoft.EntityFrameworkCore;
 using StudentManagementSystem.BLL.Interfaces;
 using StudentManagementSystem.DAL;
 using StudentManagementSystem.DAL.Models;
@@ -73,17 +72,17 @@ namespace StudentManagementSystem.BLL.LinqImplementation
             var dataTable = new DataTable();
             using (var context = new StudentManagementContext(_connectionString))
             {
-                var conn = context.Database.Connection;
-                var cmd = conn.CreateCommand();
-                cmd.CommandText = "sp_GetDepartmentHierarchy";
-                cmd.CommandType = CommandType.StoredProcedure;
-                
-                if (conn.State != ConnectionState.Open)
-                    conn.Open();
-                    
-                using (var adapter = new SqlDataAdapter((SqlCommand)cmd))
+                using (var conn = new SqlConnection(_connectionString))
                 {
-                    adapter.Fill(dataTable);
+                    conn.Open();
+                    using (var cmd = new SqlCommand("sp_GetDepartmentHierarchy", conn))
+                    {
+                        cmd.CommandType = CommandType.StoredProcedure;
+                        using (var adapter = new SqlDataAdapter(cmd))
+                        {
+                            adapter.Fill(dataTable);
+                        }
+                    }
                 }
             }
             return dataTable;
