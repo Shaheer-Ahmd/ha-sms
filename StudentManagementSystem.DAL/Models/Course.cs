@@ -18,7 +18,7 @@ namespace StudentManagementSystem.DAL.Models
         [StringLength(255)]
         public string Title { get; set; }
 
-        public string Description { get; set; }
+        public string? Description { get; set; }
 
         [Required]
         [Range(1, 6)]

@@ -6,6 +6,7 @@ using Microsoft.Data.SqlClient;
 using StudentManagementSystem.BLL.Interfaces;
 using StudentManagementSystem.DAL;
 using StudentManagementSystem.DAL.Models;
+using Microsoft.EntityFrameworkCore; // make sure this is at the top
 
 namespace StudentManagementSystem.BLL.LinqImplementation
 {
@@ -89,105 +90,118 @@ namespace StudentManagementSystem.BLL.LinqImplementation
             }
         }
 
-        public void RegisterStudentForCourse(int studentId, int offeringId)
+public void RegisterStudentForCourse(int studentId, int offeringId)
+{
+    using (var context = new StudentManagementContext(_connectionString))
+    {
+        using var transaction = context.Database.BeginTransaction();
+
+        try
         {
-            using (var context = new StudentManagementContext(_connectionString))
+            // 1. Check active holds
+            bool hasActiveHolds = context.StudentHolds
+                .Any(h => h.StudentID == studentId && h.IsActive);
+
+            if (hasActiveHolds)
+                throw new InvalidOperationException("Student has active holds. Registration denied.");
+
+            // 2. Load offering + capacity checks
+            var offering = context.CourseOfferings
+                .FirstOrDefault(o => o.OfferingID == offeringId);
+
+            if (offering == null)
+                throw new InvalidOperationException("Invalid OfferingID.");
+
+            if (offering.CurrentEnrollment >= offering.MaxCapacity)
+                throw new InvalidOperationException("Course is full.");
+
+            // Prevent double registration
+            bool alreadyEnrolled = context.Enrollments
+                .Any(e => e.StudentID == studentId && e.OfferingID == offeringId);
+
+            if (alreadyEnrolled)
+                throw new InvalidOperationException("Student is already enrolled in this course offering.");
+
+            var courseId = offering.CourseID;
+
+            // 3. Check prerequisites via LINQ
+            var prerequisiteCourseIds = context.CoursePrerequisites
+                .Where(cp => cp.CourseID == courseId)
+                .Select(cp => cp.PrerequisiteCourseID)
+                .ToList();
+
+            if (prerequisiteCourseIds.Any())
             {
-                using var transaction = context.Database.BeginTransaction();
+                var passingGrades = new[] { "A", "B", "C", "D" };
 
-                try
-                {
-                    // 1. Check active holds
-                    bool hasActiveHolds = context.StudentHolds
-                        .Any(h => h.StudentID == studentId && h.IsActive);
+                var passedPrereqCourseIds =
+                    (from e in context.Enrollments
+                     join o in context.CourseOfferings on e.OfferingID equals o.OfferingID
+                     where e.StudentID == studentId
+                           && e.Grade != null
+                           && passingGrades.Contains(e.Grade)
+                           && prerequisiteCourseIds.Contains(o.CourseID)
+                     select o.CourseID)
+                    .Distinct()
+                    .ToList();
 
-                    throw new InvalidOperationException("Student has active holds. Registration denied.");
-                    // if (hasActiveHolds)
+                bool prereqsOk = prerequisiteCourseIds.All(id => passedPrereqCourseIds.Contains(id));
 
-                    // 2. Load offering and check capacity
-                    var offering = context.CourseOfferings
-                        .FirstOrDefault(o => o.OfferingID == offeringId);
-
-                    if (offering == null)
-                        throw new InvalidOperationException("Invalid OfferingID.");
-
-                    if (offering.CurrentEnrollment >= offering.MaxCapacity)
-                        throw new InvalidOperationException("Course is full.");
-
-                    // Optional: prevent double registration in same offering
-                    bool alreadyEnrolled = context.Enrollments
-                        .Any(e => e.StudentID == studentId && e.OfferingID == offeringId);
-
-                    if (alreadyEnrolled)
-                        throw new InvalidOperationException("Student is already enrolled in this course offering.");
-
-                    var courseId = offering.CourseID;
-
-                    // 3. Check prerequisites via LINQ
-                    var prerequisiteCourseIds = context.CoursePrerequisites
-                        .Where(cp => cp.CourseID == courseId)
-                        .Select(cp => cp.PrerequisiteCourseID)
-                        .ToList();
-
-                    if (prerequisiteCourseIds.Any())
-                    {
-                        var passingGrades = new[] { "A", "B", "C", "D" };
-
-                        // Find which prerequisite courses this student has passed
-                        var passedPrereqCourseIds =
-                            (from e in context.Enrollments
-                             join o in context.CourseOfferings on e.OfferingID equals o.OfferingID
-                             where e.StudentID == studentId
-                                     && e.Grade != null
-                                     && passingGrades.Contains(e.Grade)
-                                     && prerequisiteCourseIds.Contains(o.CourseID)
-                             select o.CourseID)
-                            .Distinct()
-                            .ToList();
-
-                        bool prereqsOk = prerequisiteCourseIds.All(id => passedPrereqCourseIds.Contains(id));
-
-                        if (!prereqsOk)
-                            throw new InvalidOperationException("Prerequisites not satisfied.");
-                    }
-
-                    // 4. Atomic registration: insert enrollment + bump capacity
-                    var enrollment = new Enrollment
-                    {
-                        StudentID = studentId,
-                        OfferingID = offeringId,
-                        Grade = null,
-                        EnrollmentDate = DateTime.Today   // matches CONVERT(date, GETDATE())
-                    };
-
-                    context.Enrollments.Add(enrollment);
-                    offering.CurrentEnrollment += 1;
-
-                    context.SaveChanges();
-                    transaction.Commit();
-                }
-                catch (Exception ex)
-                {
-                    transaction.Rollback();
-                    throw new InvalidOperationException($"Registration failed: {ex.Message}", ex);
-                }
+                if (!prereqsOk)
+                    throw new InvalidOperationException("Prerequisites not satisfied.");
             }
+
+            // 4. Atomic registration: insert enrollment + bump capacity
+            var enrollment = new Enrollment
+            {
+                StudentID = studentId,
+                OfferingID = offeringId,
+                Grade = null,
+                EnrollmentDate = DateTime.Today // matches CONVERT(date, GETDATE())
+            };
+
+            context.Enrollments.Add(enrollment);
+            offering.CurrentEnrollment += 1;
+
+            context.SaveChanges();
+            transaction.Commit();
         }
+        catch (DbUpdateException ex)
+        {
+            transaction.Rollback();
+
+            var inner = ex.InnerException?.Message ?? "(no inner exception)";
+            throw new InvalidOperationException(
+                "Registration failed (DbUpdateException).\n" +
+                $"Outer: {ex.Message}\n" +
+                $"Inner: {inner}", ex);
+        }
+        catch (Exception ex)
+        {
+            transaction.Rollback();
+            throw new InvalidOperationException($"Registration failed (unexpected): {ex.Message}", ex);
+        }
+    }
+}
 
 
-        // Uses IX_Enrollments_StudentID index
+
         public List<Enrollment> GetStudentEnrollments(int studentId)
         {
             using (var context = new StudentManagementContext(_connectionString))
             {
                 return context.Enrollments
-                    .Include(e => e.CourseOffering.Course)
-                    .Include(e => e.CourseOffering.Semester)
+                    .Include(e => e.CourseOffering)
+                        .ThenInclude(co => co.Course)
+                    .Include(e => e.CourseOffering)
+                        .ThenInclude(co => co.Semester)
                     .Where(e => e.StudentID == studentId)
                     .OrderByDescending(e => e.EnrollmentDate)
+                    .AsNoTracking()
                     .ToList();
             }
         }
+
 
         // Uses IX_Enrollments_OfferingID index
         public List<Enrollment> GetCourseOfferingEnrollments(int offeringId)
@@ -268,19 +282,18 @@ namespace StudentManagementSystem.BLL.LinqImplementation
             }
         }
 
-        public void DeleteCourseOffering(int offeringId)
+public void DeleteCourseOffering(int offeringId)
+{
+    using (var context = new StudentManagementContext(_connectionString))
+    {
+        var offering = context.CourseOfferings.Find(offeringId);
+        if (offering != null)
         {
-            using (var conn = new SqlConnection(_connectionString))
-            {
-                conn.Open();
-                using (var cmd = conn.CreateCommand())
-                {
-                    cmd.CommandText = "DELETE FROM CourseOfferings WHERE OfferingID = @OfferingID";
-                    cmd.Parameters.AddWithValue("@OfferingID", offeringId);
-                    cmd.ExecuteNonQuery();
-                }
-            }
+            context.CourseOfferings.Remove(offering);
+            context.SaveChanges();
         }
+    }
+}
         public List<AuditGradeChange> GetGradeAuditLog()
         {
             using (var context = new StudentManagementContext(_connectionString))

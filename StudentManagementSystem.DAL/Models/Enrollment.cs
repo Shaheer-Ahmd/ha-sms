@@ -17,7 +17,7 @@ namespace StudentManagementSystem.DAL.Models
         public int OfferingID { get; set; }
 
         [StringLength(2)]
-        public string Grade { get; set; }
+        public string? Grade { get; set; }
 
         [Required]
         [Key, Column(Order = 1)]

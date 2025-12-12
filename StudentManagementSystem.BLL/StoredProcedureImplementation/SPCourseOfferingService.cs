@@ -21,43 +21,36 @@ namespace StudentManagementSystem.BLL.StoredProcedureImplementation
             var offerings = new List<CourseOffering>();
 
             using (var connection = new SqlConnection(_connectionString))
+            using (var command = new SqlCommand("sp_CourseOffering_GetAll", connection))
             {
+                command.CommandType = CommandType.StoredProcedure;
                 connection.Open();
-                using (var command = new SqlCommand(@"
-                    SELECT co.OfferingID, co.CourseID, co.SemesterID, 
-                           co.MaxCapacity, co.CurrentEnrollment,
-                           c.CourseCode, c.Title, c.Credits,
-                           s.Year, s.Season
-                    FROM CourseOfferings co
-                    INNER JOIN Courses c ON co.CourseID = c.CourseID
-                    INNER JOIN Semesters s ON co.SemesterID = s.SemesterID", connection))
+
+                using (var reader = command.ExecuteReader())
                 {
-                    using (var reader = command.ExecuteReader())
+                    while (reader.Read())
                     {
-                        while (reader.Read())
+                        offerings.Add(new CourseOffering
                         {
-                            offerings.Add(new CourseOffering
+                            OfferingID        = (int)reader["OfferingID"],
+                            CourseID          = (int)reader["CourseID"],
+                            SemesterID        = (int)reader["SemesterID"],
+                            MaxCapacity       = (int)reader["MaxCapacity"],
+                            CurrentEnrollment = (int)reader["CurrentEnrollment"],
+                            Course = new Course
                             {
-                                OfferingID = reader.GetInt32(0),
-                                CourseID = reader.GetInt32(1),
-                                SemesterID = reader.GetInt32(2),
-                                MaxCapacity = reader.GetInt32(3),
-                                CurrentEnrollment = reader.GetInt32(4),
-                                Course = new Course
-                                {
-                                    CourseID = reader.GetInt32(1),
-                                    CourseCode = reader.GetString(5),
-                                    Title = reader.GetString(6),
-                                    Credits = reader.GetInt32(7)
-                                },
-                                Semester = new Semester
-                                {
-                                    SemesterID = reader.GetInt32(2),
-                                    Year = reader.GetInt32(8),
-                                    Season = reader.GetString(9)
-                                }
-                            });
-                        }
+                                CourseID   = (int)reader["CourseID"],
+                                CourseCode = reader["CourseCode"].ToString(),
+                                Title      = reader["CourseTitle"].ToString(),
+                                Credits    = (int)reader["Credits"]
+                            },
+                            Semester = new Semester
+                            {
+                                SemesterID = (int)reader["SemesterID"],
+                                Year       = (int)reader["Year"],
+                                Season     = reader["Season"].ToString()
+                            }
+                        });
                     }
                 }
             }
@@ -70,37 +63,30 @@ namespace StudentManagementSystem.BLL.StoredProcedureImplementation
             var offerings = new List<CourseOffering>();
 
             using (var connection = new SqlConnection(_connectionString))
+            using (var command = new SqlCommand("sp_CourseOffering_GetBySemester", connection))
             {
-                connection.Open();
-                using (var command = new SqlCommand(@"
-                    SELECT co.OfferingID, co.CourseID, co.SemesterID, 
-                           co.MaxCapacity, co.CurrentEnrollment,
-                           c.CourseCode, c.Title
-                    FROM CourseOfferings co
-                    INNER JOIN Courses c ON co.CourseID = c.CourseID
-                    WHERE co.SemesterID = @SemesterID", connection))
-                {
-                    command.Parameters.AddWithValue("@SemesterID", semesterId);
+                command.CommandType = CommandType.StoredProcedure;
+                command.Parameters.AddWithValue("@SemesterID", semesterId);
 
-                    using (var reader = command.ExecuteReader())
+                connection.Open();
+                using (var reader = command.ExecuteReader())
+                {
+                    while (reader.Read())
                     {
-                        while (reader.Read())
+                        offerings.Add(new CourseOffering
                         {
-                            offerings.Add(new CourseOffering
+                            OfferingID        = (int)reader["OfferingID"],
+                            CourseID          = (int)reader["CourseID"],
+                            SemesterID        = (int)reader["SemesterID"],
+                            MaxCapacity       = (int)reader["MaxCapacity"],
+                            CurrentEnrollment = (int)reader["CurrentEnrollment"],
+                            Course = new Course
                             {
-                                OfferingID = reader.GetInt32(0),
-                                CourseID = reader.GetInt32(1),
-                                SemesterID = reader.GetInt32(2),
-                                MaxCapacity = reader.GetInt32(3),
-                                CurrentEnrollment = reader.GetInt32(4),
-                                Course = new Course
-                                {
-                                    CourseID = reader.GetInt32(1),
-                                    CourseCode = reader.GetString(5),
-                                    Title = reader.GetString(6)
-                                }
-                            });
-                        }
+                                CourseID   = (int)reader["CourseID"],
+                                CourseCode = reader["CourseCode"].ToString(),
+                                Title      = reader["CourseTitle"].ToString()
+                            }
+                        });
                     }
                 }
             }
@@ -113,37 +99,30 @@ namespace StudentManagementSystem.BLL.StoredProcedureImplementation
             var offerings = new List<CourseOffering>();
 
             using (var connection = new SqlConnection(_connectionString))
+            using (var command = new SqlCommand("sp_CourseOffering_GetByCourse", connection))
             {
-                connection.Open();
-                using (var command = new SqlCommand(@"
-                    SELECT co.OfferingID, co.CourseID, co.SemesterID, 
-                           co.MaxCapacity, co.CurrentEnrollment,
-                           s.Year, s.Season
-                    FROM CourseOfferings co
-                    INNER JOIN Semesters s ON co.SemesterID = s.SemesterID
-                    WHERE co.CourseID = @CourseID", connection))
-                {
-                    command.Parameters.AddWithValue("@CourseID", courseId);
+                command.CommandType = CommandType.StoredProcedure;
+                command.Parameters.AddWithValue("@CourseID", courseId);
 
-                    using (var reader = command.ExecuteReader())
+                connection.Open();
+                using (var reader = command.ExecuteReader())
+                {
+                    while (reader.Read())
                     {
-                        while (reader.Read())
+                        offerings.Add(new CourseOffering
                         {
-                            offerings.Add(new CourseOffering
+                            OfferingID        = (int)reader["OfferingID"],
+                            CourseID          = (int)reader["CourseID"],
+                            SemesterID        = (int)reader["SemesterID"],
+                            MaxCapacity       = (int)reader["MaxCapacity"],
+                            CurrentEnrollment = (int)reader["CurrentEnrollment"],
+                            Semester = new Semester
                             {
-                                OfferingID = reader.GetInt32(0),
-                                CourseID = reader.GetInt32(1),
-                                SemesterID = reader.GetInt32(2),
-                                MaxCapacity = reader.GetInt32(3),
-                                CurrentEnrollment = reader.GetInt32(4),
-                                Semester = new Semester
-                                {
-                                    SemesterID = reader.GetInt32(2),
-                                    Year = reader.GetInt32(5),
-                                    Season = reader.GetString(6)
-                                }
-                            });
-                        }
+                                SemesterID = (int)reader["SemesterID"],
+                                Year       = (int)reader["Year"],
+                                Season     = reader["Season"].ToString()
+                            }
+                        });
                     }
                 }
             }
@@ -156,27 +135,24 @@ namespace StudentManagementSystem.BLL.StoredProcedureImplementation
             var offerings = new List<CourseOffering>();
 
             using (var connection = new SqlConnection(_connectionString))
+            using (var command = new SqlCommand("sp_CourseOffering_GetAvailable", connection))
             {
+                command.CommandType = CommandType.StoredProcedure;
                 connection.Open();
-                // Uses vw_AvailableCourseOfferings view
-                using (var command = new SqlCommand(@"
-                    SELECT OfferingID, CourseID, SemesterID, 
-                           MaxCapacity, CurrentEnrollment, SeatsRemaining
-                    FROM vw_AvailableCourseOfferings", connection))
+
+                using (var reader = command.ExecuteReader())
                 {
-                    using (var reader = command.ExecuteReader())
+                    while (reader.Read())
                     {
-                        while (reader.Read())
+                        offerings.Add(new CourseOffering
                         {
-                            offerings.Add(new CourseOffering
-                            {
-                                OfferingID = reader.GetInt32(0),
-                                CourseID = reader.GetInt32(1),
-                                SemesterID = reader.GetInt32(2),
-                                MaxCapacity = reader.GetInt32(3),
-                                CurrentEnrollment = reader.GetInt32(4)
-                            });
-                        }
+                            OfferingID        = (int)reader["OfferingID"],
+                            CourseID          = (int)reader["CourseID"],
+                            SemesterID        = (int)reader["SemesterID"],
+                            MaxCapacity       = (int)reader["MaxCapacity"],
+                            CurrentEnrollment = (int)reader["CurrentEnrollment"]
+                            // SeatsRemaining is computed in SQL; you can expose it if you add a property
+                        });
                     }
                 }
             }
@@ -187,28 +163,24 @@ namespace StudentManagementSystem.BLL.StoredProcedureImplementation
         public CourseOffering GetOfferingById(int offeringId)
         {
             using (var connection = new SqlConnection(_connectionString))
+            using (var command = new SqlCommand("sp_CourseOffering_GetById", connection))
             {
-                connection.Open();
-                using (var command = new SqlCommand(@"
-                    SELECT OfferingID, CourseID, SemesterID, MaxCapacity, CurrentEnrollment
-                    FROM CourseOfferings
-                    WHERE OfferingID = @OfferingID", connection))
-                {
-                    command.Parameters.AddWithValue("@OfferingID", offeringId);
+                command.CommandType = CommandType.StoredProcedure;
+                command.Parameters.AddWithValue("@OfferingID", offeringId);
 
-                    using (var reader = command.ExecuteReader())
+                connection.Open();
+                using (var reader = command.ExecuteReader())
+                {
+                    if (reader.Read())
                     {
-                        if (reader.Read())
+                        return new CourseOffering
                         {
-                            return new CourseOffering
-                            {
-                                OfferingID = reader.GetInt32(0),
-                                CourseID = reader.GetInt32(1),
-                                SemesterID = reader.GetInt32(2),
-                                MaxCapacity = reader.GetInt32(3),
-                                CurrentEnrollment = reader.GetInt32(4)
-                            };
-                        }
+                            OfferingID        = (int)reader["OfferingID"],
+                            CourseID          = (int)reader["CourseID"],
+                            SemesterID        = (int)reader["SemesterID"],
+                            MaxCapacity       = (int)reader["MaxCapacity"],
+                            CurrentEnrollment = (int)reader["CurrentEnrollment"]
+                        };
                     }
                 }
             }
@@ -219,57 +191,46 @@ namespace StudentManagementSystem.BLL.StoredProcedureImplementation
         public void AddOffering(CourseOffering offering)
         {
             using (var connection = new SqlConnection(_connectionString))
+            using (var command = new SqlCommand("sp_CourseOffering_Add", connection))
             {
-                connection.Open();
-                using (var command = new SqlCommand(@"
-                    INSERT INTO CourseOfferings (CourseID, SemesterID, MaxCapacity, CurrentEnrollment)
-                    VALUES (@CourseID, @SemesterID, @MaxCapacity, @CurrentEnrollment)", connection))
-                {
-                    command.Parameters.AddWithValue("@CourseID", offering.CourseID);
-                    command.Parameters.AddWithValue("@SemesterID", offering.SemesterID);
-                    command.Parameters.AddWithValue("@MaxCapacity", offering.MaxCapacity);
-                    command.Parameters.AddWithValue("@CurrentEnrollment", offering.CurrentEnrollment);
+                command.CommandType = CommandType.StoredProcedure;
+                command.Parameters.AddWithValue("@CourseID",          offering.CourseID);
+                command.Parameters.AddWithValue("@SemesterID",        offering.SemesterID);
+                command.Parameters.AddWithValue("@MaxCapacity",       offering.MaxCapacity);
+                command.Parameters.AddWithValue("@CurrentEnrollment", offering.CurrentEnrollment);
 
-                    command.ExecuteNonQuery();
-                }
+                connection.Open();
+                command.ExecuteNonQuery();
             }
         }
 
         public void UpdateOffering(CourseOffering offering)
         {
             using (var connection = new SqlConnection(_connectionString))
+            using (var command = new SqlCommand("sp_CourseOffering_Update", connection))
             {
-                connection.Open();
-                using (var command = new SqlCommand(@"
-                    UPDATE CourseOfferings
-                    SET CourseID = @CourseID,
-                        SemesterID = @SemesterID,
-                        MaxCapacity = @MaxCapacity,
-                        CurrentEnrollment = @CurrentEnrollment
-                    WHERE OfferingID = @OfferingID", connection))
-                {
-                    command.Parameters.AddWithValue("@OfferingID", offering.OfferingID);
-                    command.Parameters.AddWithValue("@CourseID", offering.CourseID);
-                    command.Parameters.AddWithValue("@SemesterID", offering.SemesterID);
-                    command.Parameters.AddWithValue("@MaxCapacity", offering.MaxCapacity);
-                    command.Parameters.AddWithValue("@CurrentEnrollment", offering.CurrentEnrollment);
+                command.CommandType = CommandType.StoredProcedure;
+                command.Parameters.AddWithValue("@OfferingID",        offering.OfferingID);
+                command.Parameters.AddWithValue("@CourseID",          offering.CourseID);
+                command.Parameters.AddWithValue("@SemesterID",        offering.SemesterID);
+                command.Parameters.AddWithValue("@MaxCapacity",       offering.MaxCapacity);
+                command.Parameters.AddWithValue("@CurrentEnrollment", offering.CurrentEnrollment);
 
-                    command.ExecuteNonQuery();
-                }
+                connection.Open();
+                command.ExecuteNonQuery();
             }
         }
 
         public void DeleteOffering(int offeringId)
         {
             using (var connection = new SqlConnection(_connectionString))
+            using (var command = new SqlCommand("sp_CourseOffering_Delete", connection))
             {
+                command.CommandType = CommandType.StoredProcedure;
+                command.Parameters.AddWithValue("@OfferingID", offeringId);
+
                 connection.Open();
-                using (var command = new SqlCommand(@"
-                    DELETE FROM CourseOfferings WHERE OfferingID = @OfferingID", connection))
-                {
-                    command.Parameters.AddWithValue("@OfferingID", offeringId);
-                    command.ExecuteNonQuery();
-                }
+                command.ExecuteNonQuery();
             }
         }
     }

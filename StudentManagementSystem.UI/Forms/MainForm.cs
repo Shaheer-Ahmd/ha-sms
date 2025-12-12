@@ -1,4 +1,5 @@
 using System;
+using System.Drawing; // Added for UI logic
 using System.Windows.Forms;
 using Microsoft.Extensions.Configuration;
 using StudentManagementSystem.BLL.Factory;
@@ -21,8 +22,9 @@ namespace StudentManagementSystem.UI.Forms
 
         private void InitializeConfiguration()
         {
+            // Ensure you have the Microsoft.Extensions.Configuration.Json NuGet package installed
             var builder = new ConfigurationBuilder()
-                .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
+                .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true);
 
             _configuration = builder.Build();
         }
@@ -30,6 +32,7 @@ namespace StudentManagementSystem.UI.Forms
         private void InitializeBLL()
         {
             string bllType = _configuration["AppSettings:BLLImplementation"] ?? "LINQ";
+            
             _currentImplementation = bllType == "StoredProcedure"
                 ? BLLImplementationType.StoredProcedure
                 : BLLImplementationType.LINQ;
@@ -40,7 +43,13 @@ namespace StudentManagementSystem.UI.Forms
 
         private void UpdateStatusLabel()
         {
-            lblBLLStatus.Text = $"Current Implementation: {_currentImplementation}";
+            lblBLLStatus.Text = $"Current Backend: {_currentImplementation}";
+            
+            // Visual feedback on status
+            if (_currentImplementation == BLLImplementationType.LINQ)
+                lblBLLStatus.ForeColor = Color.Teal;
+            else
+                lblBLLStatus.ForeColor = Color.DarkOrange;
         }
 
         private void btnSwitchBLL_Click(object sender, EventArgs e)
@@ -53,8 +62,10 @@ namespace StudentManagementSystem.UI.Forms
             UpdateStatusLabel();
 
             MessageBox.Show($"Switched to {_currentImplementation} implementation!",
-                "BLL Switcher", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                "System Configuration", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
+
+        // --- Navigation Events ---
 
         private void btnStudents_Click(object sender, EventArgs e)
         {
@@ -80,17 +91,6 @@ namespace StudentManagementSystem.UI.Forms
             form.ShowDialog();
         }
 
-        private void btnExit_Click(object sender, EventArgs e)
-        {
-            Application.Exit();
-        }
-        private void btnViewGradeAudit_Click(object sender, EventArgs e)
-        {
-            using (var form = new GradeAuditForm(_bllFactory))
-            {
-                form.ShowDialog(this);
-            }
-        }
         private void btnCourseOfferings_Click(object sender, EventArgs e)
         {
             using (var form = new CourseOfferingForm(_bllFactory))
@@ -99,6 +99,34 @@ namespace StudentManagementSystem.UI.Forms
             }
         }
 
+        private void btnStudentHolds_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                var holdService = _bllFactory.GetStudentHoldService();
+                using (var form = new StudentHoldForm(holdService))
+                {
+                    form.ShowDialog(this);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error opening Student Holds form:\n{ex.Message}", 
+                    "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
 
+        private void btnViewGradeAudit_Click(object sender, EventArgs e)
+        {
+            using (var form = new GradeAuditForm(_bllFactory))
+            {
+                form.ShowDialog(this);
+            }
+        }
+
+        private void btnExit_Click(object sender, EventArgs e)
+        {
+            Application.Exit();
+        }
     }
 }

@@ -19,10 +19,13 @@ namespace StudentManagementSystem.BLL.StoredProcedureImplementation
         public List<Student> GetAllStudents()
         {
             var students = new List<Student>();
+
             using (var conn = new SqlConnection(_connectionString))
+            using (var cmd = new SqlCommand("sp_Student_GetAll", conn))
             {
-                var cmd = new SqlCommand("SELECT * FROM Students ORDER BY LastName, FirstName", conn);
+                cmd.CommandType = CommandType.StoredProcedure;
                 conn.Open();
+
                 using (var reader = cmd.ExecuteReader())
                 {
                     while (reader.Read())
@@ -31,15 +34,18 @@ namespace StudentManagementSystem.BLL.StoredProcedureImplementation
                     }
                 }
             }
+
             return students;
         }
 
         public Student GetStudentById(int studentId)
         {
             using (var conn = new SqlConnection(_connectionString))
+            using (var cmd = new SqlCommand("sp_Student_GetById", conn))
             {
-                var cmd = new SqlCommand("SELECT * FROM Students WHERE StudentID = @StudentID", conn);
+                cmd.CommandType = CommandType.StoredProcedure;
                 cmd.Parameters.AddWithValue("@StudentID", studentId);
+
                 conn.Open();
                 using (var reader = cmd.ExecuteReader())
                 {
@@ -49,15 +55,18 @@ namespace StudentManagementSystem.BLL.StoredProcedureImplementation
                     }
                 }
             }
+
             return null;
         }
 
         public Student GetStudentByEmail(string email)
         {
             using (var conn = new SqlConnection(_connectionString))
+            using (var cmd = new SqlCommand("sp_Student_GetByEmail", conn))
             {
-                var cmd = new SqlCommand("SELECT * FROM Students WHERE Email = @Email", conn);
+                cmd.CommandType = CommandType.StoredProcedure;
                 cmd.Parameters.AddWithValue("@Email", email);
+
                 conn.Open();
                 using (var reader = cmd.ExecuteReader())
                 {
@@ -67,22 +76,23 @@ namespace StudentManagementSystem.BLL.StoredProcedureImplementation
                     }
                 }
             }
+
             return null;
         }
 
         public void AddStudent(Student student)
         {
             using (var conn = new SqlConnection(_connectionString))
+            using (var cmd = new SqlCommand("sp_Student_Add", conn))
             {
-                var cmd = new SqlCommand(@"
-                    INSERT INTO Students (FirstName, LastName, Email, EnrollmentStatus, DateOfBirth)
-                    VALUES (@FirstName, @LastName, @Email, @EnrollmentStatus, @DateOfBirth)", conn);
+                cmd.CommandType = CommandType.StoredProcedure;
 
-                cmd.Parameters.AddWithValue("@FirstName", student.FirstName);
-                cmd.Parameters.AddWithValue("@LastName", student.LastName);
-                cmd.Parameters.AddWithValue("@Email", student.Email);
+                cmd.Parameters.AddWithValue("@FirstName",        student.FirstName);
+                cmd.Parameters.AddWithValue("@LastName",         student.LastName);
+                cmd.Parameters.AddWithValue("@Email",            student.Email);
                 cmd.Parameters.AddWithValue("@EnrollmentStatus", student.EnrollmentStatus);
-                cmd.Parameters.AddWithValue("@DateOfBirth", (object)student.DateOfBirth ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@DateOfBirth",
+                    (object?)student.DateOfBirth ?? DBNull.Value);
 
                 conn.Open();
                 cmd.ExecuteNonQuery();
@@ -92,46 +102,47 @@ namespace StudentManagementSystem.BLL.StoredProcedureImplementation
         public void UpdateStudent(Student student)
         {
             using (var conn = new SqlConnection(_connectionString))
+            using (var cmd = new SqlCommand("sp_Student_Update", conn))
             {
-                var cmd = new SqlCommand(@"
-                    UPDATE Students 
-                    SET FirstName = @FirstName, LastName = @LastName, 
-                        Email = @Email, EnrollmentStatus = @EnrollmentStatus, 
-                        DateOfBirth = @DateOfBirth
-                    WHERE StudentID = @StudentID", conn);
+                cmd.CommandType = CommandType.StoredProcedure;
 
-                cmd.Parameters.AddWithValue("@StudentID", student.StudentID);
-                cmd.Parameters.AddWithValue("@FirstName", student.FirstName);
-                cmd.Parameters.AddWithValue("@LastName", student.LastName);
-                cmd.Parameters.AddWithValue("@Email", student.Email);
+                cmd.Parameters.AddWithValue("@StudentID",        student.StudentID);
+                cmd.Parameters.AddWithValue("@FirstName",        student.FirstName);
+                cmd.Parameters.AddWithValue("@LastName",         student.LastName);
+                cmd.Parameters.AddWithValue("@Email",            student.Email);
                 cmd.Parameters.AddWithValue("@EnrollmentStatus", student.EnrollmentStatus);
-                cmd.Parameters.AddWithValue("@DateOfBirth", (object)student.DateOfBirth ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@DateOfBirth",
+                    (object?)student.DateOfBirth ?? DBNull.Value);
 
                 conn.Open();
                 cmd.ExecuteNonQuery();
             }
         }
 
-        // Uses INSTEAD OF DELETE trigger
         public void DeleteStudent(int studentId)
         {
+            // DELETE triggers INSTEAD OF trigger, so behavior stays the same
             using (var conn = new SqlConnection(_connectionString))
+            using (var cmd = new SqlCommand("sp_Student_Delete", conn))
             {
-                var cmd = new SqlCommand("DELETE FROM Students WHERE StudentID = @StudentID", conn);
+                cmd.CommandType = CommandType.StoredProcedure;
                 cmd.Parameters.AddWithValue("@StudentID", studentId);
+
                 conn.Open();
                 cmd.ExecuteNonQuery();
             }
         }
 
-        // Uses filtered index IX_Students_Active
         public List<Student> GetActiveStudents()
         {
             var students = new List<Student>();
+
             using (var conn = new SqlConnection(_connectionString))
+            using (var cmd = new SqlCommand("sp_Student_GetActive", conn))
             {
-                var cmd = new SqlCommand("SELECT * FROM Students WHERE EnrollmentStatus = 'Active'", conn);
+                cmd.CommandType = CommandType.StoredProcedure;
                 conn.Open();
+
                 using (var reader = cmd.ExecuteReader())
                 {
                     while (reader.Read())
@@ -140,18 +151,20 @@ namespace StudentManagementSystem.BLL.StoredProcedureImplementation
                     }
                 }
             }
+
             return students;
         }
 
         public List<Student> SearchStudents(string searchTerm)
         {
             var students = new List<Student>();
+
             using (var conn = new SqlConnection(_connectionString))
+            using (var cmd = new SqlCommand("sp_Student_Search", conn))
             {
-                var cmd = new SqlCommand(@"
-                    SELECT * FROM Students 
-                    WHERE FirstName LIKE @SearchTerm OR LastName LIKE @SearchTerm OR Email LIKE @SearchTerm", conn);
-                cmd.Parameters.AddWithValue("@SearchTerm", "%" + searchTerm + "%");
+                cmd.CommandType = CommandType.StoredProcedure;
+                cmd.Parameters.AddWithValue("@SearchTerm", searchTerm);
+
                 conn.Open();
                 using (var reader = cmd.ExecuteReader())
                 {
@@ -161,33 +174,34 @@ namespace StudentManagementSystem.BLL.StoredProcedureImplementation
                     }
                 }
             }
+
             return students;
         }
 
-        // Uses fn_CalculateGPA function
         public decimal? GetStudentGPA(int studentId)
         {
             using (var conn = new SqlConnection(_connectionString))
+            using (var cmd = new SqlCommand("sp_Student_GetGPA", conn))
             {
-                var cmd = new SqlCommand("SELECT dbo.fn_CalculateGPA(@StudentID) AS GPA", conn);
+                cmd.CommandType = CommandType.StoredProcedure;
                 cmd.Parameters.AddWithValue("@StudentID", studentId);
+
                 conn.Open();
                 var result = cmd.ExecuteScalar();
                 return result == DBNull.Value ? (decimal?)null : Convert.ToDecimal(result);
             }
         }
 
-        // Uses vw_StudentTranscript view
         public List<StudentTranscript> GetStudentTranscript(int studentId)
         {
             var transcripts = new List<StudentTranscript>();
+
             using (var conn = new SqlConnection(_connectionString))
+            using (var cmd = new SqlCommand("sp_Student_GetTranscript", conn))
             {
-                var cmd = new SqlCommand(@"
-                    SELECT * FROM vw_StudentTranscript 
-                    WHERE StudentID = @StudentID 
-                    ORDER BY Year, Season", conn);
+                cmd.CommandType = CommandType.StoredProcedure;
                 cmd.Parameters.AddWithValue("@StudentID", studentId);
+
                 conn.Open();
                 using (var reader = cmd.ExecuteReader())
                 {
@@ -195,32 +209,37 @@ namespace StudentManagementSystem.BLL.StoredProcedureImplementation
                     {
                         transcripts.Add(new StudentTranscript
                         {
-                            StudentID = (int)reader["StudentID"],
-                            FirstName = reader["FirstName"].ToString(),
-                            LastName = reader["LastName"].ToString(),
-                            CourseCode = reader["CourseCode"].ToString(),
+                            StudentID   = (int)reader["StudentID"],
+                            FirstName   = reader["FirstName"].ToString(),
+                            LastName    = reader["LastName"].ToString(),
+                            CourseCode  = reader["CourseCode"].ToString(),
                             CourseTitle = reader["CourseTitle"].ToString(),
-                            Credits = (int)reader["Credits"],
-                            Year = (int)reader["Year"],
-                            Season = reader["Season"].ToString(),
-                            Grade = reader["Grade"] == DBNull.Value ? null : reader["Grade"].ToString()
+                            Credits     = (int)reader["Credits"],
+                            Year        = (int)reader["Year"],
+                            Season      = reader["Season"].ToString(),
+                            Grade       = reader["Grade"] == DBNull.Value
+                                            ? null
+                                            : reader["Grade"].ToString()
                         });
                     }
                 }
             }
+
             return transcripts;
         }
 
-        private Student MapStudent(IDataReader reader)
+        private Student MapStudent(IDataRecord reader)
         {
             return new Student
             {
-                StudentID = (int)reader["StudentID"],
-                FirstName = reader["FirstName"].ToString(),
-                LastName = reader["LastName"].ToString(),
-                Email = reader["Email"].ToString(),
+                StudentID        = (int)reader["StudentID"],
+                FirstName        = reader["FirstName"].ToString(),
+                LastName         = reader["LastName"].ToString(),
+                Email            = reader["Email"].ToString(),
                 EnrollmentStatus = reader["EnrollmentStatus"].ToString(),
-                DateOfBirth = reader["DateOfBirth"] == DBNull.Value ? (DateTime?)null : (DateTime)reader["DateOfBirth"]
+                DateOfBirth      = reader["DateOfBirth"] == DBNull.Value
+                    ? (DateTime?)null
+                    : (DateTime)reader["DateOfBirth"]
             };
         }
     }

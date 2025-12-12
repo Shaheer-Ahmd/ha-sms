@@ -19,13 +19,13 @@ namespace StudentManagementSystem.BLL.StoredProcedureImplementation
         public List<Course> GetAllCourses()
         {
             var courses = new List<Course>();
+
             using (var conn = new SqlConnection(_connectionString))
+            using (var cmd = new SqlCommand("sp_Course_GetAll", conn))
             {
-                var cmd = new SqlCommand(@"
-                    SELECT c.*, d.DepartmentName 
-                    FROM Courses c 
-                    INNER JOIN Departments d ON c.DepartmentID = d.DepartmentID", conn);
+                cmd.CommandType = CommandType.StoredProcedure;
                 conn.Open();
+
                 using (var reader = cmd.ExecuteReader())
                 {
                     while (reader.Read())
@@ -34,19 +34,18 @@ namespace StudentManagementSystem.BLL.StoredProcedureImplementation
                     }
                 }
             }
+
             return courses;
         }
 
         public Course GetCourseById(int courseId)
         {
             using (var conn = new SqlConnection(_connectionString))
+            using (var cmd = new SqlCommand("sp_Course_GetById", conn))
             {
-                var cmd = new SqlCommand(@"
-                    SELECT c.*, d.DepartmentName 
-                    FROM Courses c 
-                    INNER JOIN Departments d ON c.DepartmentID = d.DepartmentID
-                    WHERE c.CourseID = @CourseID", conn);
+                cmd.CommandType = CommandType.StoredProcedure;
                 cmd.Parameters.AddWithValue("@CourseID", courseId);
+
                 conn.Open();
                 using (var reader = cmd.ExecuteReader())
                 {
@@ -56,19 +55,18 @@ namespace StudentManagementSystem.BLL.StoredProcedureImplementation
                     }
                 }
             }
+
             return null;
         }
 
         public Course GetCourseByCourseCode(string courseCode)
         {
             using (var conn = new SqlConnection(_connectionString))
+            using (var cmd = new SqlCommand("sp_Course_GetByCode", conn))
             {
-                var cmd = new SqlCommand(@"
-                    SELECT c.*, d.DepartmentName 
-                    FROM Courses c 
-                    INNER JOIN Departments d ON c.DepartmentID = d.DepartmentID
-                    WHERE c.CourseCode = @CourseCode", conn);
+                cmd.CommandType = CommandType.StoredProcedure;
                 cmd.Parameters.AddWithValue("@CourseCode", courseCode);
+
                 conn.Open();
                 using (var reader = cmd.ExecuteReader())
                 {
@@ -78,21 +76,21 @@ namespace StudentManagementSystem.BLL.StoredProcedureImplementation
                     }
                 }
             }
+
             return null;
         }
 
         public void AddCourse(Course course)
         {
             using (var conn = new SqlConnection(_connectionString))
+            using (var cmd = new SqlCommand("sp_Course_Add", conn))
             {
-                var cmd = new SqlCommand(@"
-                    INSERT INTO Courses (CourseCode, Title, Description, Credits, DepartmentID)
-                    VALUES (@CourseCode, @Title, @Description, @Credits, @DepartmentID)", conn);
+                cmd.CommandType = CommandType.StoredProcedure;
 
-                cmd.Parameters.AddWithValue("@CourseCode", course.CourseCode);
-                cmd.Parameters.AddWithValue("@Title", course.Title);
-                cmd.Parameters.AddWithValue("@Description", (object)course.Description ?? DBNull.Value);
-                cmd.Parameters.AddWithValue("@Credits", course.Credits);
+                cmd.Parameters.AddWithValue("@CourseCode",   course.CourseCode);
+                cmd.Parameters.AddWithValue("@Title",        course.Title);
+                cmd.Parameters.AddWithValue("@Description", (object?)course.Description ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@Credits",      course.Credits);
                 cmd.Parameters.AddWithValue("@DepartmentID", course.DepartmentID);
 
                 conn.Open();
@@ -103,18 +101,15 @@ namespace StudentManagementSystem.BLL.StoredProcedureImplementation
         public void UpdateCourse(Course course)
         {
             using (var conn = new SqlConnection(_connectionString))
+            using (var cmd = new SqlCommand("sp_Course_Update", conn))
             {
-                var cmd = new SqlCommand(@"
-                    UPDATE Courses 
-                    SET CourseCode = @CourseCode, Title = @Title, Description = @Description, 
-                        Credits = @Credits, DepartmentID = @DepartmentID
-                    WHERE CourseID = @CourseID", conn);
+                cmd.CommandType = CommandType.StoredProcedure;
 
-                cmd.Parameters.AddWithValue("@CourseID", course.CourseID);
-                cmd.Parameters.AddWithValue("@CourseCode", course.CourseCode);
-                cmd.Parameters.AddWithValue("@Title", course.Title);
-                cmd.Parameters.AddWithValue("@Description", (object)course.Description ?? DBNull.Value);
-                cmd.Parameters.AddWithValue("@Credits", course.Credits);
+                cmd.Parameters.AddWithValue("@CourseID",     course.CourseID);
+                cmd.Parameters.AddWithValue("@CourseCode",   course.CourseCode);
+                cmd.Parameters.AddWithValue("@Title",        course.Title);
+                cmd.Parameters.AddWithValue("@Description", (object?)course.Description ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@Credits",      course.Credits);
                 cmd.Parameters.AddWithValue("@DepartmentID", course.DepartmentID);
 
                 conn.Open();
@@ -125,46 +120,59 @@ namespace StudentManagementSystem.BLL.StoredProcedureImplementation
         public void DeleteCourse(int courseId)
         {
             using (var conn = new SqlConnection(_connectionString))
+            using (var cmd = new SqlCommand("sp_Course_Delete", conn))
             {
-                var cmd = new SqlCommand("DELETE FROM Courses WHERE CourseID = @CourseID", conn);
+                cmd.CommandType = CommandType.StoredProcedure;
                 cmd.Parameters.AddWithValue("@CourseID", courseId);
+
                 conn.Open();
                 cmd.ExecuteNonQuery();
             }
         }
 
-        // Uses vw_CourseCatalog view
         public List<Course> GetCourseCatalog()
         {
             var courses = new List<Course>();
+
             using (var conn = new SqlConnection(_connectionString))
+            using (var cmd = new SqlCommand("sp_Course_GetCatalog", conn))
             {
-                var cmd = new SqlCommand("SELECT * FROM vw_CourseCatalog", conn);
+                cmd.CommandType = CommandType.StoredProcedure;
                 conn.Open();
+
                 using (var reader = cmd.ExecuteReader())
                 {
                     while (reader.Read())
                     {
                         courses.Add(new Course
                         {
+                            CourseID   = (int)reader["CourseID"],
                             CourseCode = reader["CourseCode"].ToString(),
-                            Title = reader["CourseTitle"].ToString(),
-                            Credits = (int)reader["Credits"],
-                            Department = new Department { DepartmentName = reader["DepartmentName"].ToString() }
+                            Title      = reader["CourseTitle"].ToString(),
+                            Credits    = (int)reader["Credits"],
+                            Department = new Department
+                            {
+                                DepartmentID   = (int)reader["DepartmentID"],
+                                DepartmentName = reader["DepartmentName"].ToString()
+                            }
                         });
                     }
                 }
             }
+
             return courses;
         }
 
         public List<Course> GetCoursesByDepartment(int departmentId)
         {
             var courses = new List<Course>();
+
             using (var conn = new SqlConnection(_connectionString))
+            using (var cmd = new SqlCommand("sp_Course_GetByDepartment", conn))
             {
-                var cmd = new SqlCommand("SELECT * FROM Courses WHERE DepartmentID = @DepartmentID", conn);
+                cmd.CommandType = CommandType.StoredProcedure;
                 cmd.Parameters.AddWithValue("@DepartmentID", departmentId);
+
                 conn.Open();
                 using (var reader = cmd.ExecuteReader())
                 {
@@ -174,20 +182,20 @@ namespace StudentManagementSystem.BLL.StoredProcedureImplementation
                     }
                 }
             }
+
             return courses;
         }
 
         public List<CoursePrerequisite> GetCoursePrerequisites(int courseId)
         {
             var prerequisites = new List<CoursePrerequisite>();
+
             using (var conn = new SqlConnection(_connectionString))
+            using (var cmd = new SqlCommand("sp_CoursePrerequisite_GetByCourse", conn))
             {
-                var cmd = new SqlCommand(@"
-                    SELECT cp.*, c.CourseCode, c.Title 
-                    FROM CoursePrerequisites cp
-                    INNER JOIN Courses c ON cp.PrerequisiteCourseID = c.CourseID
-                    WHERE cp.CourseID = @CourseID", conn);
+                cmd.CommandType = CommandType.StoredProcedure;
                 cmd.Parameters.AddWithValue("@CourseID", courseId);
+
                 conn.Open();
                 using (var reader = cmd.ExecuteReader())
                 {
@@ -195,29 +203,31 @@ namespace StudentManagementSystem.BLL.StoredProcedureImplementation
                     {
                         prerequisites.Add(new CoursePrerequisite
                         {
-                            CourseID = (int)reader["CourseID"],
+                            CourseID             = (int)reader["CourseID"],
                             PrerequisiteCourseID = (int)reader["PrerequisiteCourseID"],
-                            PrerequisiteCourse = new Course
+                            PrerequisiteCourse   = new Course
                             {
-                                CourseID = (int)reader["PrerequisiteCourseID"],
+                                CourseID   = (int)reader["PrerequisiteCourseID"],
                                 CourseCode = reader["CourseCode"].ToString(),
-                                Title = reader["Title"].ToString()
+                                Title      = reader["Title"].ToString()
                             }
                         });
                     }
                 }
             }
+
             return prerequisites;
         }
 
-        // Uses fn_CheckPrerequisitesMet function with CTEs
         public bool CheckPrerequisitesMet(int studentId, int courseId)
         {
             using (var conn = new SqlConnection(_connectionString))
+            using (var cmd = new SqlCommand("sp_Course_CheckPrerequisitesMet", conn))
             {
-                var cmd = new SqlCommand("SELECT dbo.fn_CheckPrerequisitesMet(@StudentID, @CourseID)", conn);
+                cmd.CommandType = CommandType.StoredProcedure;
                 cmd.Parameters.AddWithValue("@StudentID", studentId);
-                cmd.Parameters.AddWithValue("@CourseID", courseId);
+                cmd.Parameters.AddWithValue("@CourseID",  courseId);
+
                 conn.Open();
                 var result = cmd.ExecuteScalar();
                 return result != null && Convert.ToBoolean(result);
@@ -229,21 +239,12 @@ namespace StudentManagementSystem.BLL.StoredProcedureImplementation
             var courses = new List<Course>();
 
             using (var conn = new SqlConnection(_connectionString))
+            using (var cmd = new SqlCommand("sp_Course_GetAvailablePrerequisiteCourses", conn))
             {
-                var cmd = new SqlCommand(@"
-                SELECT c.CourseID, c.CourseCode, c.Title, c.Description, c.Credits, c.DepartmentID, d.DepartmentName
-                FROM Courses c
-                INNER JOIN Departments d ON c.DepartmentID = d.DepartmentID
-                WHERE c.CourseID <> @CourseID
-                  AND c.CourseID NOT IN (
-                      SELECT PrerequisiteCourseID 
-                      FROM CoursePrerequisites 
-                      WHERE CourseID = @CourseID
-                  )", conn);
-
+                cmd.CommandType = CommandType.StoredProcedure;
                 cmd.Parameters.AddWithValue("@CourseID", courseId);
-                conn.Open();
 
+                conn.Open();
                 using (var reader = cmd.ExecuteReader())
                 {
                     while (reader.Read())
@@ -258,76 +259,14 @@ namespace StudentManagementSystem.BLL.StoredProcedureImplementation
 
         public void AddCoursePrerequisite(int courseId, int prerequisiteCourseId)
         {
+            // quick guard in C# (also enforced in SP)
             if (courseId == prerequisiteCourseId)
                 throw new InvalidOperationException("A course cannot be its own prerequisite.");
 
             using (var conn = new SqlConnection(_connectionString))
+            using (var cmd = new SqlCommand("sp_CoursePrerequisite_Add", conn))
             {
-                conn.Open();
-
-                // 1) Check if this exact pair already exists
-                using (var checkCmd = new SqlCommand(@"
-            SELECT COUNT(1) 
-            FROM dbo.CoursePrerequisites 
-            WHERE CourseID = @CourseID 
-              AND PrerequisiteCourseID = @PrereqID;", conn))
-                {
-                    checkCmd.Parameters.AddWithValue("@CourseID", courseId);
-                    checkCmd.Parameters.AddWithValue("@PrereqID", prerequisiteCourseId);
-
-                    var exists = (int)checkCmd.ExecuteScalar() > 0;
-                    if (exists)
-                        return;
-                }
-
-                // 2) Cycle detection: is courseId reachable from prerequisiteCourseId?
-                //    If YES, then adding (courseId -> prerequisiteCourseId) would create a cycle.
-                using (var cycleCmd = new SqlCommand(@"
-            ;WITH PrereqChain AS (
-                SELECT @PrereqID AS CourseID
-                UNION ALL
-                SELECT cp.PrerequisiteCourseID
-                FROM dbo.CoursePrerequisites cp
-                JOIN PrereqChain pc
-                  ON cp.CourseID = pc.CourseID
-            )
-            SELECT CASE WHEN EXISTS (
-                SELECT 1 FROM PrereqChain WHERE CourseID = @CourseID
-            ) THEN 1 ELSE 0 END
-            OPTION (MAXRECURSION 1000);", conn))
-                {
-                    cycleCmd.Parameters.AddWithValue("@CourseID", courseId);
-                    cycleCmd.Parameters.AddWithValue("@PrereqID", prerequisiteCourseId);
-
-                    var wouldCycle = (int)cycleCmd.ExecuteScalar() == 1;
-                    if (wouldCycle)
-                        throw new InvalidOperationException(
-                            "This prerequisite would create a circular dependency between courses."
-                        );
-                }
-
-                // 3) Insert safe prereq
-                using (var insertCmd = new SqlCommand(@"
-            INSERT INTO dbo.CoursePrerequisites (CourseID, PrerequisiteCourseID)
-            VALUES (@CourseID, @PrereqID);", conn))
-                {
-                    insertCmd.Parameters.AddWithValue("@CourseID", courseId);
-                    insertCmd.Parameters.AddWithValue("@PrereqID", prerequisiteCourseId);
-                    insertCmd.ExecuteNonQuery();
-                }
-            }
-        }
-
-
-        // 🔹 NEW: remove prerequisite relationship
-        public void RemoveCoursePrerequisite(int courseId, int prerequisiteCourseId)
-        {
-            using (var conn = new SqlConnection(_connectionString))
-            {
-                var cmd = new SqlCommand(@"
-                DELETE FROM CoursePrerequisites
-                WHERE CourseID = @CourseID AND PrerequisiteCourseID = @PrereqID", conn);
-
+                cmd.CommandType = CommandType.StoredProcedure;
                 cmd.Parameters.AddWithValue("@CourseID", courseId);
                 cmd.Parameters.AddWithValue("@PrereqID", prerequisiteCourseId);
 
@@ -336,19 +275,35 @@ namespace StudentManagementSystem.BLL.StoredProcedureImplementation
             }
         }
 
-        private Course MapCourse(IDataReader reader)
+        public void RemoveCoursePrerequisite(int courseId, int prerequisiteCourseId)
+        {
+            using (var conn = new SqlConnection(_connectionString))
+            using (var cmd = new SqlCommand("sp_CoursePrerequisite_Remove", conn))
+            {
+                cmd.CommandType = CommandType.StoredProcedure;
+                cmd.Parameters.AddWithValue("@CourseID", courseId);
+                cmd.Parameters.AddWithValue("@PrereqID", prerequisiteCourseId);
+
+                conn.Open();
+                cmd.ExecuteNonQuery();
+            }
+        }
+
+        private Course MapCourse(IDataRecord reader)
         {
             return new Course
             {
-                CourseID = (int)reader["CourseID"],
-                CourseCode = reader["CourseCode"].ToString(),
-                Title = reader["Title"].ToString(),
-                Description = reader["Description"] == DBNull.Value ? null : reader["Description"].ToString(),
-                Credits = (int)reader["Credits"],
+                CourseID     = (int)reader["CourseID"],
+                CourseCode   = reader["CourseCode"].ToString(),
+                Title        = reader["Title"].ToString(),
+                Description  = reader["Description"] == DBNull.Value
+                                    ? null
+                                    : reader["Description"].ToString(),
+                Credits      = (int)reader["Credits"],
                 DepartmentID = (int)reader["DepartmentID"],
-                Department = new Department
+                Department   = new Department
                 {
-                    DepartmentID = (int)reader["DepartmentID"],
+                    DepartmentID   = (int)reader["DepartmentID"],
                     DepartmentName = reader["DepartmentName"].ToString()
                 }
             };

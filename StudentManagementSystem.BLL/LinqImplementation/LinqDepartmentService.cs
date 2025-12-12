@@ -51,20 +51,18 @@ namespace StudentManagementSystem.BLL.LinqImplementation
                 context.SaveChanges();
             }
         }
-
-        public void DeleteDepartment(int departmentId)
+public void DeleteDepartment(int departmentId)
+{
+    using (var context = new StudentManagementContext(_connectionString))
+    {
+        var department = context.Departments.Find(departmentId);
+        if (department != null)
         {
-            using (var conn = new SqlConnection(_connectionString))
-            {
-                conn.Open();
-                using (var cmd = conn.CreateCommand())
-                {
-                    cmd.CommandText = "DELETE FROM Departments WHERE DepartmentID = @DepartmentID";
-                    cmd.Parameters.AddWithValue("@DepartmentID", departmentId);
-                    cmd.ExecuteNonQuery();
-                }
-            }
+            context.Departments.Remove(department);
+            context.SaveChanges();
         }
+    }
+}
 
 public DataTable GetDepartmentHierarchy()
 {

@@ -70,17 +70,14 @@ namespace StudentManagementSystem.BLL.LinqImplementation
 
         public void DeleteStudent(int studentId)
         {
-            using (var conn = new SqlConnection(_connectionString))
+            using (var context = new StudentManagementContext(_connectionString))
             {
-                conn.Open();
-                using (var cmd = conn.CreateCommand())
+                var student = context.Students.Find(studentId);
+                if (student != null)
                 {
-                    cmd.CommandText = @"
-                        UPDATE Students 
-                        SET EnrollmentStatus = 'Inactive' 
-                        WHERE StudentID = @StudentID";
-                    cmd.Parameters.AddWithValue("@StudentID", studentId);
-                    cmd.ExecuteNonQuery();
+                    // Soft-delete behaviour preserved: mark as Inactive
+                    student.EnrollmentStatus = "Inactive";
+                    context.SaveChanges();
                 }
             }
         }
@@ -108,29 +105,77 @@ namespace StudentManagementSystem.BLL.LinqImplementation
             }
         }
 
-        // Uses fn_CalculateGPA function
-        public decimal? GetStudentGPA(int studentId)
-        {
-            using (var context = new StudentManagementContext(_connectionString))
+public decimal? GetStudentGPA(int studentId)
+{
+    using (var context = new StudentManagementContext(_connectionString))
+    {
+        // Join Enrollments -> CourseOfferings -> Courses
+        var completed = (
+            from e in context.Enrollments
+            join o in context.CourseOfferings on e.OfferingID equals o.OfferingID
+            join c in context.Courses on o.CourseID equals c.CourseID
+            where e.StudentID == studentId && e.Grade != null
+            select new
             {
-                var result = context.Database
-                    .SqlQueryRaw<decimal?>("SELECT dbo.fn_CalculateGPA({0})", studentId)
-                    .FirstOrDefault();
-                return result;
-            }
+                e.Grade,
+                c.Credits
+            })
+            .ToList(); // materialize then compute in-memory (for grade mapping)
+
+        if (!completed.Any())
+            return null;
+
+        decimal GradeToPoints(string grade)
+        {
+            // Adjust if you use +/-; this matches a simple A–F scale
+            return grade switch
+            {
+                "A" => 4m,
+                "B" => 3m,
+                "C" => 2m,
+                "D" => 1m,
+                "F" => 0m,
+                _   => 0m
+            };
         }
 
-        // Uses vw_StudentTranscript view
+        var totalCredits = completed.Sum(x => x.Credits);
+        if (totalCredits == 0)
+            return null;
+
+        var totalPoints = completed.Sum(x => GradeToPoints(x.Grade!) * x.Credits);
+
+        return totalPoints / totalCredits;
+    }
+}
+
         public List<StudentTranscript> GetStudentTranscript(int studentId)
-        {
-            using (var context = new StudentManagementContext(_connectionString))
+{
+    using (var context = new StudentManagementContext(_connectionString))
+    {
+        var query =
+            from s in context.Students
+            join e in context.Enrollments on s.StudentID equals e.StudentID
+            join o in context.CourseOfferings on e.OfferingID equals o.OfferingID
+            join c in context.Courses on o.CourseID equals c.CourseID
+            join sem in context.Semesters on o.SemesterID equals sem.SemesterID
+            where s.StudentID == studentId
+            orderby sem.Year, sem.Season
+            select new StudentTranscript
             {
-                return context.StudentTranscripts
-                    .Where(st => st.StudentID == studentId)
-                    .OrderBy(st => st.Year)
-                    .ThenBy(st => st.Season)
-                    .ToList();
-            }
-        }
+                StudentID   = s.StudentID,
+                FirstName   = s.FirstName,
+                LastName    = s.LastName,
+                CourseCode  = c.CourseCode,
+                CourseTitle = c.Title,
+                Credits     = c.Credits,
+                Year        = sem.Year,
+                Season      = sem.Season,
+                Grade       = e.Grade
+            };
+
+        return query.ToList();
+    }
+}
     }
 }

@@ -26,10 +26,10 @@ namespace StudentManagementSystem.DAL.Models
 
         // Navigation properties
         [ForeignKey("CourseID")]
-        public virtual Course Course { get; set; }
+        public virtual Course? Course { get; set; }
 
         [ForeignKey("SemesterID")]
-        public virtual Semester Semester { get; set; }
+        public virtual Semester? Semester { get; set; }
 
         public virtual ICollection<Enrollment> Enrollments { get; set; }
 

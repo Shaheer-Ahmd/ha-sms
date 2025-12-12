@@ -86,23 +86,29 @@ namespace StudentManagementSystem.DAL
                 .OnDelete(DeleteBehavior.Restrict);
 
             // Enrollment - Composite Key
-            modelBuilder.Entity<Enrollment>()
-                .HasKey(e => new { e.EnrollmentID, e.EnrollmentDate });
+   modelBuilder.Entity<Enrollment>(entity =>
+    {
+        entity.HasKey(e => new { e.EnrollmentID, e.EnrollmentDate });
 
-            modelBuilder.Entity<Enrollment>()
-                .HasOne(e => e.Student)
-                .WithMany(s => s.Enrollments)
-                .HasForeignKey(e => e.StudentID)
-                .OnDelete(DeleteBehavior.Restrict);
+        entity.Property(e => e.EnrollmentID)
+              .ValueGeneratedOnAdd();
 
-            modelBuilder.Entity<Enrollment>()
-                .HasOne(e => e.CourseOffering)
-                .WithMany(co => co.Enrollments)
-                .HasForeignKey(e => e.OfferingID)
-                .OnDelete(DeleteBehavior.Restrict);
+        entity.Property(e => e.EnrollmentDate)
+              .HasColumnType("date");
 
-            modelBuilder.Entity<Enrollment>()
-            .ToTable(tb => tb.UseSqlOutputClause(false));
+        // Relationships
+        entity.HasOne(e => e.Student)
+              .WithMany(s => s.Enrollments)
+              .HasForeignKey(e => e.StudentID)
+              .OnDelete(DeleteBehavior.Restrict);
+
+        entity.HasOne(e => e.CourseOffering)
+              .WithMany(co => co.Enrollments)
+              .HasForeignKey(e => e.OfferingID)
+              .OnDelete(DeleteBehavior.Restrict);
+
+        entity.ToTable(tb => tb.UseSqlOutputClause(false));
+    });
 
             // StudentHold
             modelBuilder.Entity<StudentHold>()

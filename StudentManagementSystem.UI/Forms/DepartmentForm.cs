@@ -85,6 +85,21 @@ namespace StudentManagementSystem.UI.Forms
             }
         }
 
+        private int? GetSelectedParentDepartmentId()
+{
+    if (cmbParentDepartment.SelectedValue == null)
+        return null;
+
+    // SelectedValue comes from an anonymous type list, so it should be an int,
+    // but we’ll be defensive and parse it.
+    if (!int.TryParse(cmbParentDepartment.SelectedValue.ToString(), out var value))
+        return null;
+
+    // Our sentinel for root is -1 → map that (and any <= 0) to NULL
+    return value > 0 ? value : (int?)null;
+}
+
+
         private void btnAdd_Click(object sender, EventArgs e)
         {
             try
@@ -97,13 +112,12 @@ namespace StudentManagementSystem.UI.Forms
                 }
 
                 var department = new Department
-                {
-                    DepartmentName = txtDepartmentName.Text.Trim(),
-                    ParentDepartmentID = cmbParentDepartment.SelectedValue != null
-                        ? (int?)cmbParentDepartment.SelectedValue
-                        : null,
-                    IsActive = chkIsActive.Checked
-                };
+{
+    DepartmentName = txtDepartmentName.Text.Trim(),
+    ParentDepartmentID = GetSelectedParentDepartmentId(),
+    IsActive = chkIsActive.Checked
+};
+
 
                 _departmentService.AddDepartment(department);
                 MessageBox.Show("Department added successfully!", "Success",
@@ -144,12 +158,11 @@ namespace StudentManagementSystem.UI.Forms
                 if (department != null)
                 {
                     department.DepartmentName = txtDepartmentName.Text.Trim();
-                    department.ParentDepartmentID = cmbParentDepartment.SelectedValue != null
-                        ? (int?)cmbParentDepartment.SelectedValue
-                        : null;
+                    department.ParentDepartmentID = GetSelectedParentDepartmentId();
                     department.IsActive = chkIsActive.Checked;
 
                     _departmentService.UpdateDepartment(department);
+
                     MessageBox.Show("Department updated successfully!", "Success",
                         MessageBoxButtons.OK, MessageBoxIcon.Information);
 

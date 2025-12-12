@@ -19,62 +19,57 @@ namespace StudentManagementSystem.BLL.StoredProcedureImplementation
         public List<Department> GetAllDepartments()
         {
             var departments = new List<Department>();
+
             using (var conn = new SqlConnection(_connectionString))
+            using (var cmd = new SqlCommand("sp_Department_GetAll", conn))
             {
-                var cmd = new SqlCommand("SELECT * FROM Departments", conn);
+                cmd.CommandType = CommandType.StoredProcedure;
                 conn.Open();
+
                 using (var reader = cmd.ExecuteReader())
                 {
                     while (reader.Read())
                     {
-                        departments.Add(new Department
-                        {
-                            DepartmentID = (int)reader["DepartmentID"],
-                            DepartmentName = reader["DepartmentName"].ToString(),
-                            ParentDepartmentID = reader["ParentDepartmentID"] == DBNull.Value ? (int?)null : (int)reader["ParentDepartmentID"],
-                            IsActive = (bool)reader["IsActive"]
-                        });
+                        departments.Add(MapDepartment(reader));
                     }
                 }
             }
+
             return departments;
         }
 
         public Department GetDepartmentById(int departmentId)
         {
             using (var conn = new SqlConnection(_connectionString))
+            using (var cmd = new SqlCommand("sp_Department_GetById", conn))
             {
-                var cmd = new SqlCommand("SELECT * FROM Departments WHERE DepartmentID = @DepartmentID", conn);
+                cmd.CommandType = CommandType.StoredProcedure;
                 cmd.Parameters.AddWithValue("@DepartmentID", departmentId);
+
                 conn.Open();
                 using (var reader = cmd.ExecuteReader())
                 {
                     if (reader.Read())
                     {
-                        return new Department
-                        {
-                            DepartmentID = (int)reader["DepartmentID"],
-                            DepartmentName = reader["DepartmentName"].ToString(),
-                            ParentDepartmentID = reader["ParentDepartmentID"] == DBNull.Value ? (int?)null : (int)reader["ParentDepartmentID"],
-                            IsActive = (bool)reader["IsActive"]
-                        };
+                        return MapDepartment(reader);
                     }
                 }
             }
+
             return null;
         }
 
         public void AddDepartment(Department department)
         {
             using (var conn = new SqlConnection(_connectionString))
+            using (var cmd = new SqlCommand("sp_Department_Add", conn))
             {
-                var cmd = new SqlCommand(@"
-                    INSERT INTO Departments (DepartmentName, ParentDepartmentID, IsActive)
-                    VALUES (@DepartmentName, @ParentDepartmentID, @IsActive)", conn);
+                cmd.CommandType = CommandType.StoredProcedure;
 
-                cmd.Parameters.AddWithValue("@DepartmentName", department.DepartmentName);
-                cmd.Parameters.AddWithValue("@ParentDepartmentID", (object)department.ParentDepartmentID ?? DBNull.Value);
-                cmd.Parameters.AddWithValue("@IsActive", department.IsActive);
+                cmd.Parameters.AddWithValue("@DepartmentName",     department.DepartmentName);
+                cmd.Parameters.AddWithValue("@ParentDepartmentID",
+                    (object?)department.ParentDepartmentID ?? System.DBNull.Value);
+                cmd.Parameters.AddWithValue("@IsActive",           department.IsActive);
 
                 conn.Open();
                 cmd.ExecuteNonQuery();
@@ -84,16 +79,15 @@ namespace StudentManagementSystem.BLL.StoredProcedureImplementation
         public void UpdateDepartment(Department department)
         {
             using (var conn = new SqlConnection(_connectionString))
+            using (var cmd = new SqlCommand("sp_Department_Update", conn))
             {
-                var cmd = new SqlCommand(@"
-                    UPDATE Departments 
-                    SET DepartmentName = @DepartmentName, ParentDepartmentID = @ParentDepartmentID, IsActive = @IsActive
-                    WHERE DepartmentID = @DepartmentID", conn);
+                cmd.CommandType = CommandType.StoredProcedure;
 
-                cmd.Parameters.AddWithValue("@DepartmentID", department.DepartmentID);
-                cmd.Parameters.AddWithValue("@DepartmentName", department.DepartmentName);
-                cmd.Parameters.AddWithValue("@ParentDepartmentID", (object)department.ParentDepartmentID ?? DBNull.Value);
-                cmd.Parameters.AddWithValue("@IsActive", department.IsActive);
+                cmd.Parameters.AddWithValue("@DepartmentID",       department.DepartmentID);
+                cmd.Parameters.AddWithValue("@DepartmentName",     department.DepartmentName);
+                cmd.Parameters.AddWithValue("@ParentDepartmentID",
+                    (object?)department.ParentDepartmentID ?? System.DBNull.Value);
+                cmd.Parameters.AddWithValue("@IsActive",           department.IsActive);
 
                 conn.Open();
                 cmd.ExecuteNonQuery();
@@ -103,53 +97,68 @@ namespace StudentManagementSystem.BLL.StoredProcedureImplementation
         public void DeleteDepartment(int departmentId)
         {
             using (var conn = new SqlConnection(_connectionString))
+            using (var cmd = new SqlCommand("sp_Department_Delete", conn))
             {
-                var cmd = new SqlCommand("DELETE FROM Departments WHERE DepartmentID = @DepartmentID", conn);
+                cmd.CommandType = CommandType.StoredProcedure;
                 cmd.Parameters.AddWithValue("@DepartmentID", departmentId);
+
                 conn.Open();
                 cmd.ExecuteNonQuery();
             }
         }
 
-        // Uses sp_GetDepartmentHierarchy with recursive CTE
         public DataTable GetDepartmentHierarchy()
         {
-            var dataTable = new DataTable();
+            var table = new DataTable();
+
             using (var conn = new SqlConnection(_connectionString))
+            using (var cmd = new SqlCommand("sp_GetDepartmentHierarchy", conn))
             {
-                var cmd = new SqlCommand("sp_GetDepartmentHierarchy", conn);
                 cmd.CommandType = CommandType.StoredProcedure;
                 conn.Open();
+
                 using (var adapter = new SqlDataAdapter(cmd))
                 {
-                    adapter.Fill(dataTable);
+                    adapter.Fill(table);
                 }
             }
-            return dataTable;
+
+            return table;
         }
 
         public List<Department> GetActiveDepartments()
         {
             var departments = new List<Department>();
+
             using (var conn = new SqlConnection(_connectionString))
+            using (var cmd = new SqlCommand("sp_Department_GetActive", conn))
             {
-                var cmd = new SqlCommand("SELECT * FROM Departments WHERE IsActive = 1", conn);
+                cmd.CommandType = CommandType.StoredProcedure;
                 conn.Open();
+
                 using (var reader = cmd.ExecuteReader())
                 {
                     while (reader.Read())
                     {
-                        departments.Add(new Department
-                        {
-                            DepartmentID = (int)reader["DepartmentID"],
-                            DepartmentName = reader["DepartmentName"].ToString(),
-                            ParentDepartmentID = reader["ParentDepartmentID"] == DBNull.Value ? (int?)null : (int)reader["ParentDepartmentID"],
-                            IsActive = (bool)reader["IsActive"]
-                        });
+                        departments.Add(MapDepartment(reader));
                     }
                 }
             }
+
             return departments;
+        }
+
+        private Department MapDepartment(IDataRecord reader)
+        {
+            return new Department
+            {
+                DepartmentID       = (int)reader["DepartmentID"],
+                DepartmentName     = reader["DepartmentName"].ToString(),
+                ParentDepartmentID = reader["ParentDepartmentID"] == System.DBNull.Value
+                    ? (int?)null
+                    : (int)reader["ParentDepartmentID"],
+                IsActive           = (bool)reader["IsActive"]
+            };
         }
     }
 }

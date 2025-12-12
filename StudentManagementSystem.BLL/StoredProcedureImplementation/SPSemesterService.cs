@@ -1,5 +1,5 @@
-using System;
 using System.Collections.Generic;
+using System.Data;
 using Microsoft.Data.SqlClient;
 using StudentManagementSystem.BLL.Interfaces;
 using StudentManagementSystem.DAL.Models;
@@ -18,56 +18,55 @@ namespace StudentManagementSystem.BLL.StoredProcedureImplementation
         public List<Semester> GetAllSemesters()
         {
             var semesters = new List<Semester>();
+
             using (var conn = new SqlConnection(_connectionString))
+            using (var cmd = new SqlCommand("sp_Semester_GetAll", conn))
             {
-                var cmd = new SqlCommand("SELECT * FROM Semesters ORDER BY Year DESC, Season", conn);
+                cmd.CommandType = CommandType.StoredProcedure;
                 conn.Open();
+
                 using (var reader = cmd.ExecuteReader())
                 {
                     while (reader.Read())
                     {
-                        semesters.Add(new Semester
-                        {
-                            SemesterID = (int)reader["SemesterID"],
-                            Year = (int)reader["Year"],
-                            Season = reader["Season"].ToString()
-                        });
+                        semesters.Add(MapSemester(reader));
                     }
                 }
             }
+
             return semesters;
         }
 
         public Semester GetSemesterById(int semesterId)
         {
             using (var conn = new SqlConnection(_connectionString))
+            using (var cmd = new SqlCommand("sp_Semester_GetById", conn))
             {
-                var cmd = new SqlCommand("SELECT * FROM Semesters WHERE SemesterID = @SemesterID", conn);
+                cmd.CommandType = CommandType.StoredProcedure;
                 cmd.Parameters.AddWithValue("@SemesterID", semesterId);
+
                 conn.Open();
                 using (var reader = cmd.ExecuteReader())
                 {
                     if (reader.Read())
                     {
-                        return new Semester
-                        {
-                            SemesterID = (int)reader["SemesterID"],
-                            Year = (int)reader["Year"],
-                            Season = reader["Season"].ToString()
-                        };
+                        return MapSemester(reader);
                     }
                 }
             }
+
             return null;
         }
 
         public void AddSemester(Semester semester)
         {
             using (var conn = new SqlConnection(_connectionString))
+            using (var cmd = new SqlCommand("sp_Semester_Add", conn))
             {
-                var cmd = new SqlCommand("INSERT INTO Semesters (Year, Season) VALUES (@Year, @Season)", conn);
-                cmd.Parameters.AddWithValue("@Year", semester.Year);
+                cmd.CommandType = CommandType.StoredProcedure;
+                cmd.Parameters.AddWithValue("@Year",   semester.Year);
                 cmd.Parameters.AddWithValue("@Season", semester.Season);
+
                 conn.Open();
                 cmd.ExecuteNonQuery();
             }
@@ -76,11 +75,14 @@ namespace StudentManagementSystem.BLL.StoredProcedureImplementation
         public void UpdateSemester(Semester semester)
         {
             using (var conn = new SqlConnection(_connectionString))
+            using (var cmd = new SqlCommand("sp_Semester_Update", conn))
             {
-                var cmd = new SqlCommand("UPDATE Semesters SET Year = @Year, Season = @Season WHERE SemesterID = @SemesterID", conn);
+                cmd.CommandType = CommandType.StoredProcedure;
+
                 cmd.Parameters.AddWithValue("@SemesterID", semester.SemesterID);
-                cmd.Parameters.AddWithValue("@Year", semester.Year);
-                cmd.Parameters.AddWithValue("@Season", semester.Season);
+                cmd.Parameters.AddWithValue("@Year",       semester.Year);
+                cmd.Parameters.AddWithValue("@Season",     semester.Season);
+
                 conn.Open();
                 cmd.ExecuteNonQuery();
             }
@@ -89,9 +91,11 @@ namespace StudentManagementSystem.BLL.StoredProcedureImplementation
         public void DeleteSemester(int semesterId)
         {
             using (var conn = new SqlConnection(_connectionString))
+            using (var cmd = new SqlCommand("sp_Semester_Delete", conn))
             {
-                var cmd = new SqlCommand("DELETE FROM Semesters WHERE SemesterID = @SemesterID", conn);
+                cmd.CommandType = CommandType.StoredProcedure;
                 cmd.Parameters.AddWithValue("@SemesterID", semesterId);
+
                 conn.Open();
                 cmd.ExecuteNonQuery();
             }
@@ -100,46 +104,54 @@ namespace StudentManagementSystem.BLL.StoredProcedureImplementation
         public Semester GetCurrentSemester()
         {
             using (var conn = new SqlConnection(_connectionString))
+            using (var cmd = new SqlCommand("sp_Semester_GetCurrent", conn))
             {
-                var cmd = new SqlCommand("SELECT TOP 1 * FROM Semesters ORDER BY Year DESC, Season DESC", conn);
+                cmd.CommandType = CommandType.StoredProcedure;
                 conn.Open();
+
                 using (var reader = cmd.ExecuteReader())
                 {
                     if (reader.Read())
                     {
-                        return new Semester
-                        {
-                            SemesterID = (int)reader["SemesterID"],
-                            Year = (int)reader["Year"],
-                            Season = reader["Season"].ToString()
-                        };
+                        return MapSemester(reader);
                     }
                 }
             }
+
             return null;
         }
 
         public List<Semester> GetRecentSemesters(int count)
         {
             var semesters = new List<Semester>();
+
             using (var conn = new SqlConnection(_connectionString))
+            using (var cmd = new SqlCommand("sp_Semester_GetRecent", conn))
             {
-                var cmd = new SqlCommand($"SELECT TOP {count} * FROM Semesters ORDER BY Year DESC, Season DESC", conn);
+                cmd.CommandType = CommandType.StoredProcedure;
+                cmd.Parameters.AddWithValue("@Count", count);
+
                 conn.Open();
                 using (var reader = cmd.ExecuteReader())
                 {
                     while (reader.Read())
                     {
-                        semesters.Add(new Semester
-                        {
-                            SemesterID = (int)reader["SemesterID"],
-                            Year = (int)reader["Year"],
-                            Season = reader["Season"].ToString()
-                        });
+                        semesters.Add(MapSemester(reader));
                     }
                 }
             }
+
             return semesters;
+        }
+
+        private Semester MapSemester(IDataRecord reader)
+        {
+            return new Semester
+            {
+                SemesterID = (int)reader["SemesterID"],
+                Year       = (int)reader["Year"],
+                Season     = reader["Season"].ToString()
+            };
         }
     }
 }

@@ -74,14 +74,13 @@ namespace StudentManagementSystem.BLL.LinqImplementation
 
         public void DeleteCourse(int courseId)
         {
-            using (var conn = new SqlConnection(_connectionString))
+            using (var context = new StudentManagementContext(_connectionString))
             {
-                conn.Open();
-                using (var cmd = conn.CreateCommand())
+                var course = context.Courses.Find(courseId);
+                if (course != null)
                 {
-                    cmd.CommandText = "DELETE FROM Courses WHERE CourseID = @CourseID";
-                    cmd.Parameters.AddWithValue("@CourseID", courseId);
-                    cmd.ExecuteNonQuery();
+                    context.Courses.Remove(course);
+                    context.SaveChanges();
                 }
             }
         }
@@ -122,17 +121,38 @@ namespace StudentManagementSystem.BLL.LinqImplementation
             }
         }
 
-        // Uses fn_CheckPrerequisitesMet function
-        public bool CheckPrerequisitesMet(int studentId, int courseId)
-        {
-            using (var context = new StudentManagementContext(_connectionString))
-            {
-                var result = context.Database
-                    .SqlQueryRaw<bool>("SELECT dbo.fn_CheckPrerequisitesMet({0}, {1})", studentId, courseId)
-                    .FirstOrDefault();
-                return result;
-            }
-        }
+public bool CheckPrerequisitesMet(int studentId, int courseId)
+{
+    using (var context = new StudentManagementContext(_connectionString))
+    {
+        // 1) Get all direct prerequisite courses for this course
+        var prerequisiteCourseIds = context.CoursePrerequisites
+            .Where(cp => cp.CourseID == courseId)
+            .Select(cp => cp.PrerequisiteCourseID)
+            .ToList();
+
+        // If no prereqs, trivially satisfied
+        if (!prerequisiteCourseIds.Any())
+            return true;
+
+        var passingGrades = new[] { "A", "B", "C", "D" };
+
+        // 2) Find which prerequisite courses the student has already passed
+        var passedPrereqCourseIds =
+            (from e in context.Enrollments
+             join o in context.CourseOfferings on e.OfferingID equals o.OfferingID
+             where e.StudentID == studentId
+                   && e.Grade != null
+                   && passingGrades.Contains(e.Grade)
+                   && prerequisiteCourseIds.Contains(o.CourseID)
+             select o.CourseID)
+            .Distinct()
+            .ToList();
+
+        // 3) All prereqs must be in the "passed" set
+        return prerequisiteCourseIds.All(id => passedPrereqCourseIds.Contains(id));
+    }
+}
 
         public List<Course> GetAvailablePrerequisiteCourses(int courseId)
         {
