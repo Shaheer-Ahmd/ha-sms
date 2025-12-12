@@ -1,16 +1,10 @@
-
 /* ===========================================================
-   Student Management System - FULL CLEAN COMBINED SCRIPT (WORKING)
+   Student Management System - Core Schema (Clean Version)
    - Drops & recreates StudentManagementDB from scratch
-   - Keeps ALL updated changes from your NEW file
-   - Also brings in the OLD "working" bits you had:
-       * SQL-Edge compatible Course insert (VALUES cross-join)
-       * Optional ChangedByLogin column + trigger populates it
-   - Fixes the partitioned UNIQUE/PK error on Audit_GradeChanges
-     (PK includes partition column EnrollmentDate)
+   - Creates tables, indexes, FKs, and extended properties
    =========================================================== */
 
-PRINT '=== RUNNING DB Creation ===';
+PRINT '=== RUNNING StudentManagementDB_creation.sql v2 (no ChangedByAdminID) ===';
 GO
 
 ---------------------------------------------------------------
@@ -18,7 +12,8 @@ GO
 ---------------------------------------------------------------
 IF DB_ID('StudentManagementDB') IS NOT NULL
 BEGIN
-    ALTER DATABASE StudentManagementDB SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+    ALTER DATABASE StudentManagementDB 
+        SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
     DROP DATABASE StudentManagementDB;
 END;
 GO
@@ -31,15 +26,17 @@ GO
 
 ---------------------------------------------------------------
 -- A. Partitioning Infrastructure
+--    We'll partition by date (year) for Enrollments & Audit_GradeChanges
 ---------------------------------------------------------------
 
 -- 1) Partition Enrollments by EnrollmentDate
-IF EXISTS (SELECT 1 FROM sys.partition_schemes WHERE name = 'PS_EnrollmentsByDate')
-    DROP PARTITION SCHEME PS_EnrollmentsByDate;
-IF EXISTS (SELECT 1 FROM sys.partition_functions WHERE name = 'PF_EnrollmentsByDate')
+IF EXISTS (SELECT * FROM sys.partition_functions WHERE name = 'PF_EnrollmentsByDate')
     DROP PARTITION FUNCTION PF_EnrollmentsByDate;
+IF EXISTS (SELECT * FROM sys.partition_schemes WHERE name = 'PS_EnrollmentsByDate')
+    DROP PARTITION SCHEME PS_EnrollmentsByDate;
 GO
 
+-- Range RIGHT: each boundary starts a new partition
 CREATE PARTITION FUNCTION PF_EnrollmentsByDate (DATE)
 AS RANGE RIGHT FOR VALUES
 (
@@ -56,11 +53,11 @@ AS PARTITION PF_EnrollmentsByDate
 ALL TO ([PRIMARY]);
 GO
 
--- 2) Partition Audit_GradeChanges by EnrollmentDate (matches your design)
-IF EXISTS (SELECT 1 FROM sys.partition_schemes WHERE name = 'PS_AuditByDate')
-    DROP PARTITION SCHEME PS_AuditByDate;
-IF EXISTS (SELECT 1 FROM sys.partition_functions WHERE name = 'PF_AuditByDate')
+-- 2) Partition Audit_GradeChanges by ChangeDate
+IF EXISTS (SELECT * FROM sys.partition_functions WHERE name = 'PF_AuditByDate')
     DROP PARTITION FUNCTION PF_AuditByDate;
+IF EXISTS (SELECT * FROM sys.partition_schemes WHERE name = 'PS_AuditByDate')
+    DROP PARTITION SCHEME PS_AuditByDate;
 GO
 
 CREATE PARTITION FUNCTION PF_AuditByDate (DATE)
@@ -78,6 +75,7 @@ CREATE PARTITION SCHEME PS_AuditByDate
 AS PARTITION PF_AuditByDate
 ALL TO ([PRIMARY]);
 GO
+
 
 ---------------------------------------------------------------
 -- 1. Core Tables
@@ -149,7 +147,7 @@ CREATE TABLE dbo.Enrollments (
     EnrollmentID   INT IDENTITY(1,1) NOT NULL,
     StudentID      INT NOT NULL,
     OfferingID     INT NOT NULL,
-    Grade          NVARCHAR(2) NULL
+    Grade          NVARCHAR(2) NULL  -- NULL for in-progress courses
         CONSTRAINT CK_Enrollments_Grade
         CHECK (Grade IN ('A', 'B', 'C', 'D', 'F') OR Grade IS NULL),
     EnrollmentDate DATE NOT NULL,
@@ -157,6 +155,7 @@ CREATE TABLE dbo.Enrollments (
         PRIMARY KEY NONCLUSTERED (EnrollmentID, EnrollmentDate) ON [PRIMARY]
 ) ON PS_EnrollmentsByDate(EnrollmentDate);
 GO
+
 
 CREATE TABLE dbo.StudentHolds (
     HoldID      INT IDENTITY(1,1) PRIMARY KEY,
@@ -170,9 +169,6 @@ CREATE TABLE dbo.StudentHolds (
 );
 GO
 
-/* IMPORTANT FIX:
-   This table is partitioned by EnrollmentDate, so the PK (unique index)
-   MUST include EnrollmentDate in the key. */
 CREATE TABLE dbo.Audit_GradeChanges (
     AuditID        INT IDENTITY(1,1) NOT NULL,
     EnrollmentID   INT NOT NULL,
@@ -186,34 +182,41 @@ CREATE TABLE dbo.Audit_GradeChanges (
     ChangeDate     DATETIME2(0) NOT NULL
         CONSTRAINT DF_Audit_GradeChanges_ChangeDate DEFAULT (SYSUTCDATETIME()),
     CONSTRAINT PK_Audit_GradeChanges
-        PRIMARY KEY NONCLUSTERED (AuditID, EnrollmentDate) ON [PRIMARY]
+        PRIMARY KEY NONCLUSTERED (AuditID) ON [PRIMARY]
 ) ON PS_AuditByDate(EnrollmentDate);
 GO
+
+
+
 
 ---------------------------------------------------------------
 -- 2. Indexes
 ---------------------------------------------------------------
 
+-- Students: quick lookup of active students
 CREATE INDEX IX_Students_Active
 ON dbo.Students (EnrollmentStatus)
 WHERE EnrollmentStatus = 'Active';
 GO
 
+-- Semesters: year + season unique
 CREATE UNIQUE INDEX UQ_Semesters_Year_Season
 ON dbo.Semesters ([Year], Season);
 GO
 
+-- Course offerings: each course appears at most once per semester
 CREATE UNIQUE INDEX UQ_CourseOfferings_Course_Semester
 ON dbo.CourseOfferings (CourseID, SemesterID);
 GO
 
--- NOTE: This unique index is on a partitioned table but is NOT aligned to partition scheme.
--- If your SQL Server complains, you must include EnrollmentDate in the key and/or align to partition scheme.
+-- Enrollments: one enrollment per student per offering (non-partitioned index)
 CREATE UNIQUE INDEX UQ_Enrollments_Student_Offering
 ON dbo.Enrollments (StudentID, OfferingID)
 ON [PRIMARY];
 GO
 
+
+-- Enrollments: fast failing-courses queries
 CREATE INDEX IX_Enrollments_FailedCourses
 ON dbo.Enrollments (StudentID, OfferingID)
 WHERE Grade = 'F';
@@ -383,14 +386,22 @@ ADD CONSTRAINT FK_Audit_GradeChanges_Enrollment
     ON DELETE NO ACTION;
 GO
 
+
+
+
+
 /* ===========================================================
    Student Management System - Features Script
+   (Run AFTER core tables are created)
    =========================================================== */
 
+---------------------------------------------------------------
+-- 0. Use target database & small schema tweaks
+---------------------------------------------------------------
 USE StudentManagementDB;
 GO
 
--- Add IsActive flag to Departments
+-- Add IsActive flag to Departments (for Course Catalog view)
 IF COL_LENGTH('dbo.Departments', 'IsActive') IS NULL
 BEGIN
     ALTER TABLE dbo.Departments
@@ -399,7 +410,7 @@ BEGIN
 END;
 GO
 
--- Add IsActive flag to StudentHolds
+-- Add IsActive flag to StudentHolds (for active holds logic + index)
 IF COL_LENGTH('dbo.StudentHolds', 'IsActive') IS NULL
 BEGIN
     ALTER TABLE dbo.StudentHolds
@@ -408,23 +419,17 @@ BEGIN
 END;
 GO
 
--- Bring back the "working" audit add-on from old script:
--- store login name in audit table (no Admin table needed)
-IF COL_LENGTH('dbo.Audit_GradeChanges', 'ChangedByLogin') IS NULL
-BEGIN
-    ALTER TABLE dbo.Audit_GradeChanges
-    ADD ChangedByLogin NVARCHAR(256) NOT NULL
-        CONSTRAINT DF_Audit_GradeChanges_ChangedByLogin DEFAULT (SYSTEM_USER);
-END;
-GO
-
 /* ===========================================================
    1. VIEWS
    =========================================================== */
 
+-------------------------------
+-- 1.1 vw_CourseCatalog
+-------------------------------
 IF OBJECT_ID('dbo.vw_CourseCatalog', 'V') IS NOT NULL
     DROP VIEW dbo.vw_CourseCatalog;
 GO
+
 CREATE VIEW dbo.vw_CourseCatalog
 AS
 SELECT
@@ -441,13 +446,19 @@ JOIN dbo.Departments AS d
 WHERE d.IsActive = 1;
 GO
 
+-------------------------------
+-- 1.2 vw_AvailableCourseOfferings
+-------------------------------
 IF OBJECT_ID('dbo.vw_AvailableCourseOfferings', 'V') IS NOT NULL
     DROP VIEW dbo.vw_AvailableCourseOfferings;
 GO
+
 CREATE VIEW dbo.vw_AvailableCourseOfferings
 AS
 SELECT
     o.OfferingID,
+    o.CourseID,
+    o.SemesterID,
     c.CourseCode,
     c.Title        AS CourseTitle,
     s.[Year],
@@ -461,9 +472,13 @@ JOIN dbo.Semesters       AS s ON o.SemesterID = s.SemesterID
 WHERE o.CurrentEnrollment < o.MaxCapacity;
 GO
 
+-------------------------------
+-- 1.3 vw_StudentTranscript
+-------------------------------
 IF OBJECT_ID('dbo.vw_StudentTranscript', 'V') IS NOT NULL
     DROP VIEW dbo.vw_StudentTranscript;
 GO
+
 CREATE VIEW dbo.vw_StudentTranscript
 AS
 SELECT
@@ -481,16 +496,20 @@ JOIN dbo.Students         AS st ON e.StudentID   = st.StudentID
 JOIN dbo.CourseOfferings  AS o  ON e.OfferingID  = o.OfferingID
 JOIN dbo.Courses          AS c  ON o.CourseID    = c.CourseID
 JOIN dbo.Semesters        AS s  ON o.SemesterID  = s.SemesterID
-WHERE e.Grade IS NOT NULL;
+WHERE e.Grade IS NOT NULL;   -- completed courses only
 GO
 
 /* ===========================================================
    2. FUNCTIONS
    =========================================================== */
 
+-------------------------------
+-- 2.1 fn_CheckPrerequisitesMet (@StudentID, @CourseID)
+-------------------------------
 IF OBJECT_ID('dbo.fn_CheckPrerequisitesMet', 'FN') IS NOT NULL
     DROP FUNCTION dbo.fn_CheckPrerequisitesMet;
 GO
+
 CREATE FUNCTION dbo.fn_CheckPrerequisitesMet
 (
     @StudentID INT,
@@ -501,14 +520,21 @@ AS
 BEGIN
     DECLARE @result BIT = 1;
 
-    IF EXISTS (SELECT 1 FROM dbo.CoursePrerequisites WHERE CourseID = @CourseID)
+    -- Only check if the course actually has prerequisites
+    IF EXISTS (
+        SELECT 1
+        FROM dbo.CoursePrerequisites
+        WHERE CourseID = @CourseID
+    )
     BEGIN
         ;WITH Needed AS (
+            -- All required prerequisite courses
             SELECT cp.PrerequisiteCourseID AS PrereqCourseID
             FROM dbo.CoursePrerequisites AS cp
             WHERE cp.CourseID = @CourseID
         ),
         Taken AS (
+            -- All courses this student has passed (A–D)
             SELECT DISTINCT c.CourseID
             FROM dbo.Enrollments     AS e
             JOIN dbo.CourseOfferings AS o ON e.OfferingID = o.OfferingID
@@ -516,24 +542,36 @@ BEGIN
             WHERE e.StudentID = @StudentID
               AND e.Grade IN ('A','B','C','D')
         )
+        -- Single statement after CTE: set @result
         SELECT @result =
-            CASE WHEN EXISTS (
-                SELECT 1
-                FROM Needed AS n
-                LEFT JOIN Taken AS t ON n.PrereqCourseID = t.CourseID
-                WHERE t.CourseID IS NULL
-            )
-            THEN 0 ELSE 1 END;
+            CASE 
+                WHEN EXISTS (
+                    SELECT 1
+                    FROM Needed AS n
+                    LEFT JOIN Taken AS t
+                        ON n.PrereqCourseID = t.CourseID
+                    WHERE t.CourseID IS NULL   -- missing at least one prereq
+                )
+                THEN 0
+                ELSE 1
+            END;
     END
 
     RETURN @result;
 END;
 GO
 
+-------------------------------
+-- 2.2 fn_CalculateGPA (@StudentID)
+-------------------------------
 IF OBJECT_ID('dbo.fn_CalculateGPA', 'FN') IS NOT NULL
     DROP FUNCTION dbo.fn_CalculateGPA;
 GO
-CREATE FUNCTION dbo.fn_CalculateGPA(@StudentID INT)
+
+CREATE FUNCTION dbo.fn_CalculateGPA
+(
+    @StudentID INT
+)
 RETURNS DECIMAL(3,2)
 AS
 BEGIN
@@ -554,7 +592,7 @@ BEGIN
         JOIN dbo.CourseOfferings AS o ON e.OfferingID = o.OfferingID
         JOIN dbo.Courses         AS c ON o.CourseID   = c.CourseID
         WHERE e.StudentID = @StudentID
-          AND e.Grade IS NOT NULL
+          AND e.Grade IS NOT NULL         -- ignore in-progress courses
     )
     SELECT @gpa =
         CASE WHEN SUM(Credits) = 0 THEN NULL
@@ -566,10 +604,17 @@ BEGIN
 END;
 GO
 
+-------------------------------
+-- 2.3 fn_GetStudentTranscript (@StudentID) - inline TVF
+-------------------------------
 IF OBJECT_ID('dbo.fn_GetStudentTranscript', 'IF') IS NOT NULL
     DROP FUNCTION dbo.fn_GetStudentTranscript;
 GO
-CREATE FUNCTION dbo.fn_GetStudentTranscript(@StudentID INT)
+
+CREATE FUNCTION dbo.fn_GetStudentTranscript
+(
+    @StudentID INT
+)
 RETURNS TABLE
 AS
 RETURN
@@ -587,12 +632,16 @@ RETURN
 GO
 
 /* ===========================================================
-   3. STORED PROCEDURES (core ones from your updated script)
+   3. STORED PROCEDURES
    =========================================================== */
 
+-------------------------------
+-- 3.1 sp_RegisterStudentForCourse
+-------------------------------
 IF OBJECT_ID('dbo.sp_RegisterStudentForCourse', 'P') IS NOT NULL
     DROP PROCEDURE dbo.sp_RegisterStudentForCourse;
 GO
+
 CREATE PROCEDURE dbo.sp_RegisterStudentForCourse
     @StudentID  INT,
     @OfferingID INT
@@ -606,6 +655,7 @@ BEGIN
         @currentEnroll  INT,
         @prereqsOk      BIT;
 
+    -- 1. Check active holds
     IF EXISTS (
         SELECT 1
         FROM dbo.StudentHolds
@@ -617,6 +667,7 @@ BEGIN
         RETURN;
     END
 
+    -- 2. Check offering and capacity
     SELECT
         @courseID      = o.CourseID,
         @maxCap        = o.MaxCapacity,
@@ -636,6 +687,7 @@ BEGIN
         RETURN;
     END
 
+    -- 3. Check prerequisites
     SET @prereqsOk = dbo.fn_CheckPrerequisitesMet(@StudentID, @courseID);
 
     IF @prereqsOk = 0
@@ -644,6 +696,7 @@ BEGIN
         RETURN;
     END
 
+    -- 4. Atomic registration
     BEGIN TRY
         BEGIN TRANSACTION;
 
@@ -657,7 +710,8 @@ BEGIN
         COMMIT TRANSACTION;
     END TRY
     BEGIN CATCH
-        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        IF @@TRANCOUNT > 0
+            ROLLBACK TRANSACTION;
 
         DECLARE @msg NVARCHAR(4000) = ERROR_MESSAGE();
         RAISERROR('Registration failed: %s', 16, 1, @msg);
@@ -665,15 +719,20 @@ BEGIN
 END;
 GO
 
+-------------------------------
+-- 3.2 sp_GetDepartmentHierarchy
+-------------------------------
 IF OBJECT_ID('dbo.sp_GetDepartmentHierarchy', 'P') IS NOT NULL
     DROP PROCEDURE dbo.sp_GetDepartmentHierarchy;
 GO
+
 CREATE PROCEDURE dbo.sp_GetDepartmentHierarchy
 AS
 BEGIN
     SET NOCOUNT ON;
 
     ;WITH DepartmentHierarchy AS (
+        -- Root (no parent)
         SELECT
             d.DepartmentID,
             d.DepartmentName,
@@ -685,6 +744,7 @@ BEGIN
 
         UNION ALL
 
+        -- Children
         SELECT
             child.DepartmentID,
             child.DepartmentName,
@@ -706,68 +766,473 @@ BEGIN
 END;
 GO
 
+-------------------------------
+-- 3.3 sp_GetStudentTranscriptAndGPA
+-------------------------------
 IF OBJECT_ID('dbo.sp_GetStudentTranscriptAndGPA', 'P') IS NOT NULL
     DROP PROCEDURE dbo.sp_GetStudentTranscriptAndGPA;
 GO
+
 CREATE PROCEDURE dbo.sp_GetStudentTranscriptAndGPA
     @StudentID INT
 AS
 BEGIN
     SET NOCOUNT ON;
 
-    SELECT * FROM dbo.fn_GetStudentTranscript(@StudentID);
+    -- Transcript
+    SELECT *
+    FROM dbo.fn_GetStudentTranscript(@StudentID);
+
+    -- GPA
     SELECT dbo.fn_CalculateGPA(@StudentID) AS GPA;
 END;
 GO
 
-/* ===========================================================
-    Course Prerequisite Stored Procedures
-   =========================================================== */
+---------------------------------------------------------------
+-- CourseOffering stored procedures
+---------------------------------------------------------------
+IF OBJECT_ID('dbo.sp_CourseOffering_GetAll', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_CourseOffering_GetAll;
+GO
+CREATE PROCEDURE dbo.sp_CourseOffering_GetAll
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT
+        co.OfferingID,
+        co.CourseID,
+        co.SemesterID,
+        co.MaxCapacity,
+        co.CurrentEnrollment,
+        c.CourseCode,
+        c.Title       AS CourseTitle,
+        c.Credits,
+        s.[Year],
+        s.Season
+    FROM dbo.CourseOfferings co
+    JOIN dbo.Courses   c ON co.CourseID   = c.CourseID
+    JOIN dbo.Semesters s ON co.SemesterID = s.SemesterID;
+END;
+GO
+
+IF OBJECT_ID('dbo.sp_CourseOffering_GetBySemester', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_CourseOffering_GetBySemester;
+GO
+CREATE PROCEDURE dbo.sp_CourseOffering_GetBySemester
+    @SemesterID INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT
+        co.OfferingID,
+        co.CourseID,
+        co.SemesterID,
+        co.MaxCapacity,
+        co.CurrentEnrollment,
+        c.CourseCode,
+        c.Title       AS CourseTitle
+    FROM dbo.CourseOfferings co
+    JOIN dbo.Courses c ON co.CourseID = c.CourseID
+    WHERE co.SemesterID = @SemesterID;
+END;
+GO
+
+IF OBJECT_ID('dbo.sp_CourseOffering_GetByCourse', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_CourseOffering_GetByCourse;
+GO
+CREATE PROCEDURE dbo.sp_CourseOffering_GetByCourse
+    @CourseID INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT
+        co.OfferingID,
+        co.CourseID,
+        co.SemesterID,
+        co.MaxCapacity,
+        co.CurrentEnrollment,
+        s.[Year],
+        s.Season
+    FROM dbo.CourseOfferings co
+    JOIN dbo.Semesters s ON co.SemesterID = s.SemesterID
+    WHERE co.CourseID = @CourseID;
+END;
+GO
+
+IF OBJECT_ID('dbo.sp_CourseOffering_GetAvailable', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_CourseOffering_GetAvailable;
+GO
+CREATE PROCEDURE dbo.sp_CourseOffering_GetAvailable
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT
+        o.OfferingID,
+        o.CourseID,
+        o.SemesterID,
+        o.MaxCapacity,
+        o.CurrentEnrollment,
+        (o.MaxCapacity - o.CurrentEnrollment) AS SeatsRemaining
+    FROM dbo.CourseOfferings o
+    WHERE o.CurrentEnrollment < o.MaxCapacity;
+END;
+GO
+
+IF OBJECT_ID('dbo.sp_CourseOffering_GetById', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_CourseOffering_GetById;
+GO
+CREATE PROCEDURE dbo.sp_CourseOffering_GetById
+    @OfferingID INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT
+        OfferingID,
+        CourseID,
+        SemesterID,
+        MaxCapacity,
+        CurrentEnrollment
+    FROM dbo.CourseOfferings
+    WHERE OfferingID = @OfferingID;
+END;
+GO
+
+IF OBJECT_ID('dbo.sp_CourseOffering_Add', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_CourseOffering_Add;
+GO
+CREATE PROCEDURE dbo.sp_CourseOffering_Add
+    @CourseID          INT,
+    @SemesterID        INT,
+    @MaxCapacity       INT,
+    @CurrentEnrollment INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    INSERT INTO dbo.CourseOfferings (CourseID, SemesterID, MaxCapacity, CurrentEnrollment)
+    VALUES (@CourseID, @SemesterID, @MaxCapacity, @CurrentEnrollment);
+END;
+GO
+
+IF OBJECT_ID('dbo.sp_CourseOffering_Update', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_CourseOffering_Update;
+GO
+CREATE PROCEDURE dbo.sp_CourseOffering_Update
+    @OfferingID        INT,
+    @CourseID          INT,
+    @SemesterID        INT,
+    @MaxCapacity       INT,
+    @CurrentEnrollment INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    UPDATE dbo.CourseOfferings
+    SET CourseID          = @CourseID,
+        SemesterID        = @SemesterID,
+        MaxCapacity       = @MaxCapacity,
+        CurrentEnrollment = @CurrentEnrollment
+    WHERE OfferingID = @OfferingID;
+END;
+GO
+
+IF OBJECT_ID('dbo.sp_CourseOffering_Delete', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_CourseOffering_Delete;
+GO
+CREATE PROCEDURE dbo.sp_CourseOffering_Delete
+    @OfferingID INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DELETE FROM dbo.CourseOfferings
+    WHERE OfferingID = @OfferingID;
+END;
+GO
+
+---------------------------------------------------------------
+-- Course stored procedures
+---------------------------------------------------------------
+IF OBJECT_ID('dbo.sp_Course_GetAll', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_Course_GetAll;
+GO
+CREATE PROCEDURE dbo.sp_Course_GetAll
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT 
+        c.CourseID,
+        c.CourseCode,
+        c.Title,
+        c.[Description],
+        c.Credits,
+        c.DepartmentID,
+        d.DepartmentName
+    FROM dbo.Courses c
+    JOIN dbo.Departments d ON c.DepartmentID = d.DepartmentID;
+END;
+GO
+
+IF OBJECT_ID('dbo.sp_Course_GetById', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_Course_GetById;
+GO
+CREATE PROCEDURE dbo.sp_Course_GetById
+    @CourseID INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT 
+        c.CourseID,
+        c.CourseCode,
+        c.Title,
+        c.[Description],
+        c.Credits,
+        c.DepartmentID,
+        d.DepartmentName
+    FROM dbo.Courses c
+    JOIN dbo.Departments d ON c.DepartmentID = d.DepartmentID
+    WHERE c.CourseID = @CourseID;
+END;
+GO
+
+IF OBJECT_ID('dbo.sp_Course_GetByCode', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_Course_GetByCode;
+GO
+CREATE PROCEDURE dbo.sp_Course_GetByCode
+    @CourseCode NVARCHAR(255)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT 
+        c.CourseID,
+        c.CourseCode,
+        c.Title,
+        c.[Description],
+        c.Credits,
+        c.DepartmentID,
+        d.DepartmentName
+    FROM dbo.Courses c
+    JOIN dbo.Departments d ON c.DepartmentID = d.DepartmentID
+    WHERE c.CourseCode = @CourseCode;
+END;
+GO
+
+IF OBJECT_ID('dbo.sp_Course_Add', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_Course_Add;
+GO
+CREATE PROCEDURE dbo.sp_Course_Add
+    @CourseCode   NVARCHAR(255),
+    @Title        NVARCHAR(255),
+    @Description  NVARCHAR(MAX) = NULL,
+    @Credits      INT,
+    @DepartmentID INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    INSERT INTO dbo.Courses (CourseCode, Title, [Description], Credits, DepartmentID)
+    VALUES (@CourseCode, @Title, @Description, @Credits, @DepartmentID);
+END;
+GO
+
+IF OBJECT_ID('dbo.sp_Course_Update', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_Course_Update;
+GO
+CREATE PROCEDURE dbo.sp_Course_Update
+    @CourseID     INT,
+    @CourseCode   NVARCHAR(255),
+    @Title        NVARCHAR(255),
+    @Description  NVARCHAR(MAX) = NULL,
+    @Credits      INT,
+    @DepartmentID INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    UPDATE dbo.Courses
+    SET CourseCode   = @CourseCode,
+        Title        = @Title,
+        [Description]= @Description,
+        Credits      = @Credits,
+        DepartmentID = @DepartmentID
+    WHERE CourseID = @CourseID;
+END;
+GO
+
+IF OBJECT_ID('dbo.sp_Course_Delete', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_Course_Delete;
+GO
+CREATE PROCEDURE dbo.sp_Course_Delete
+    @CourseID INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DELETE FROM dbo.Courses
+    WHERE CourseID = @CourseID;
+END;
+GO
+
+IF OBJECT_ID('dbo.sp_Course_GetCatalog', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_Course_GetCatalog;
+GO
+CREATE PROCEDURE dbo.sp_Course_GetCatalog
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT
+        CourseID,
+        CourseCode,
+        CourseTitle,
+        Credits,
+        DepartmentID,
+        DepartmentName
+    FROM dbo.vw_CourseCatalog;
+END;
+GO
+
+IF OBJECT_ID('dbo.sp_Course_GetByDepartment', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_Course_GetByDepartment;
+GO
+CREATE PROCEDURE dbo.sp_Course_GetByDepartment
+    @DepartmentID INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT 
+        c.CourseID,
+        c.CourseCode,
+        c.Title,
+        c.[Description],
+        c.Credits,
+        c.DepartmentID,
+        d.DepartmentName
+    FROM dbo.Courses c
+    JOIN dbo.Departments d ON c.DepartmentID = d.DepartmentID
+    WHERE c.DepartmentID = @DepartmentID;
+END;
+GO
+
+IF OBJECT_ID('dbo.sp_CoursePrerequisite_GetByCourse', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_CoursePrerequisite_GetByCourse;
+GO
+CREATE PROCEDURE dbo.sp_CoursePrerequisite_GetByCourse
+    @CourseID INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT 
+        cp.CourseID,
+        cp.PrerequisiteCourseID,
+        c.CourseCode,
+        c.Title
+    FROM dbo.CoursePrerequisites cp
+    JOIN dbo.Courses c ON cp.PrerequisiteCourseID = c.CourseID
+    WHERE cp.CourseID = @CourseID;
+END;
+GO
+
+IF OBJECT_ID('dbo.sp_Course_CheckPrerequisitesMet', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_Course_CheckPrerequisitesMet;
+GO
+CREATE PROCEDURE dbo.sp_Course_CheckPrerequisitesMet
+    @StudentID INT,
+    @CourseID  INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT dbo.fn_CheckPrerequisitesMet(@StudentID, @CourseID) AS IsMet;
+END;
+GO
+
+IF OBJECT_ID('dbo.sp_Course_GetAvailablePrerequisiteCourses', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_Course_GetAvailablePrerequisiteCourses;
+GO
+CREATE PROCEDURE dbo.sp_Course_GetAvailablePrerequisiteCourses
+    @CourseID INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT 
+        c.CourseID,
+        c.CourseCode,
+        c.Title,
+        c.[Description],
+        c.Credits,
+        c.DepartmentID,
+        d.DepartmentName
+    FROM dbo.Courses c
+    JOIN dbo.Departments d ON c.DepartmentID = d.DepartmentID
+    WHERE c.CourseID <> @CourseID
+      AND c.CourseID NOT IN (
+          SELECT PrerequisiteCourseID
+          FROM dbo.CoursePrerequisites
+          WHERE CourseID = @CourseID
+      );
+END;
+GO
 
 IF OBJECT_ID('dbo.sp_CoursePrerequisite_Add', 'P') IS NOT NULL
     DROP PROCEDURE dbo.sp_CoursePrerequisite_Add;
 GO
 CREATE PROCEDURE dbo.sp_CoursePrerequisite_Add
-    @CourseID INT,
-    @PrereqID INT
+    @CourseID  INT,
+    @PrereqID  INT
 AS
 BEGIN
     SET NOCOUNT ON;
 
-    -- No self-reference
+    DECLARE @HasCycle BIT = 0;
+
     IF @CourseID = @PrereqID
     BEGIN
         RAISERROR('A course cannot be its own prerequisite.', 16, 1);
         RETURN;
     END
 
-    -- Prevent duplicates
+    -- Already exists?
     IF EXISTS (
         SELECT 1
         FROM dbo.CoursePrerequisites
         WHERE CourseID = @CourseID
           AND PrerequisiteCourseID = @PrereqID
     )
-        RETURN;
-
-    -- Prevent circular dependency
     BEGIN
-        ;WITH PrereqChain AS (
-            SELECT @PrereqID AS CourseID
-            UNION ALL
-            SELECT cp.PrerequisiteCourseID
-            FROM dbo.CoursePrerequisites cp
-            JOIN PrereqChain pc ON cp.CourseID = pc.CourseID
-        )
+        RETURN; -- no-op
+    END
+
+    -- Cycle detection: check if @CourseID appears in the prerequisite chain of @PrereqID
+    ;WITH PrereqChain AS (
+        SELECT @PrereqID AS ChainCourseID
+        UNION ALL
+        SELECT cp.PrerequisiteCourseID
+        FROM dbo.CoursePrerequisites cp
+        JOIN PrereqChain pc ON cp.CourseID = pc.ChainCourseID
+    )
+    SELECT @HasCycle = CASE WHEN EXISTS (
         SELECT 1
         FROM PrereqChain
-        WHERE CourseID = @CourseID;
+        WHERE ChainCourseID = @CourseID
+    ) THEN 1 ELSE 0 END
+    OPTION (MAXRECURSION 100);
 
-        IF @@ROWCOUNT > 0
-        BEGIN
-            RAISERROR('Circular prerequisite detected.', 16, 1);
-            RETURN;
-        END
+    IF @HasCycle = 1
+    BEGIN
+        RAISERROR('This prerequisite would create a circular dependency between courses.', 16, 1);
+        RETURN;
     END
 
     INSERT INTO dbo.CoursePrerequisites (CourseID, PrerequisiteCourseID)
@@ -791,13 +1256,733 @@ BEGIN
 END;
 GO
 
+---------------------------------------------------------------
+-- Department stored procedures
+---------------------------------------------------------------
+IF OBJECT_ID('dbo.sp_Department_GetAll', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_Department_GetAll;
+GO
+CREATE PROCEDURE dbo.sp_Department_GetAll
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT DepartmentID, DepartmentName, ParentDepartmentID, IsActive
+    FROM dbo.Departments;
+END;
+GO
+
+IF OBJECT_ID('dbo.sp_Department_GetById', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_Department_GetById;
+GO
+CREATE PROCEDURE dbo.sp_Department_GetById
+    @DepartmentID INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT DepartmentID, DepartmentName, ParentDepartmentID, IsActive
+    FROM dbo.Departments
+    WHERE DepartmentID = @DepartmentID;
+END;
+GO
+
+IF OBJECT_ID('dbo.sp_Department_Add', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_Department_Add;
+GO
+CREATE PROCEDURE dbo.sp_Department_Add
+    @DepartmentName     NVARCHAR(255),
+    @ParentDepartmentID INT = NULL,
+    @IsActive           BIT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    INSERT INTO dbo.Departments (DepartmentName, ParentDepartmentID, IsActive)
+    VALUES (@DepartmentName, @ParentDepartmentID, @IsActive);
+END;
+GO
+
+IF OBJECT_ID('dbo.sp_Department_Update', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_Department_Update;
+GO
+CREATE PROCEDURE dbo.sp_Department_Update
+    @DepartmentID       INT,
+    @DepartmentName     NVARCHAR(255),
+    @ParentDepartmentID INT = NULL,
+    @IsActive           BIT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    UPDATE dbo.Departments
+    SET DepartmentName     = @DepartmentName,
+        ParentDepartmentID = @ParentDepartmentID,
+        IsActive           = @IsActive
+    WHERE DepartmentID = @DepartmentID;
+END;
+GO
+
+IF OBJECT_ID('dbo.sp_Department_Delete', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_Department_Delete;
+GO
+CREATE PROCEDURE dbo.sp_Department_Delete
+    @DepartmentID INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DELETE FROM dbo.Departments
+    WHERE DepartmentID = @DepartmentID;
+END;
+GO
+
+IF OBJECT_ID('dbo.sp_Department_GetActive', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_Department_GetActive;
+GO
+CREATE PROCEDURE dbo.sp_Department_GetActive
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT DepartmentID, DepartmentName, ParentDepartmentID, IsActive
+    FROM dbo.Departments
+    WHERE IsActive = 1
+    ORDER BY DepartmentName;
+END;
+GO
+
+---------------------------------------------------------------
+-- Enrollment stored procedures
+---------------------------------------------------------------
+IF OBJECT_ID('dbo.sp_Enrollment_GetAll', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_Enrollment_GetAll;
+GO
+CREATE PROCEDURE dbo.sp_Enrollment_GetAll
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT EnrollmentID, StudentID, OfferingID, Grade, EnrollmentDate
+    FROM dbo.Enrollments;
+END;
+GO
+
+IF OBJECT_ID('dbo.sp_Enrollment_GetById', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_Enrollment_GetById;
+GO
+CREATE PROCEDURE dbo.sp_Enrollment_GetById
+    @EnrollmentID   INT,
+    @EnrollmentDate DATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT EnrollmentID, StudentID, OfferingID, Grade, EnrollmentDate
+    FROM dbo.Enrollments
+    WHERE EnrollmentID   = @EnrollmentID
+      AND EnrollmentDate = @EnrollmentDate;
+END;
+GO
+
+IF OBJECT_ID('dbo.sp_Enrollment_UpdateGrade', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_Enrollment_UpdateGrade;
+GO
+CREATE PROCEDURE dbo.sp_Enrollment_UpdateGrade
+    @EnrollmentID   INT,
+    @EnrollmentDate DATE,
+    @Grade          NVARCHAR(2) = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    UPDATE dbo.Enrollments
+    SET Grade = @Grade
+    WHERE EnrollmentID   = @EnrollmentID
+      AND EnrollmentDate = @EnrollmentDate;
+END;
+GO
+
+IF OBJECT_ID('dbo.sp_Enrollment_GetByStudent', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_Enrollment_GetByStudent;
+GO
+CREATE PROCEDURE dbo.sp_Enrollment_GetByStudent
+    @StudentID INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT EnrollmentID, StudentID, OfferingID, Grade, EnrollmentDate
+    FROM dbo.Enrollments
+    WHERE StudentID = @StudentID;
+END;
+GO
+
+IF OBJECT_ID('dbo.sp_Enrollment_GetByOffering', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_Enrollment_GetByOffering;
+GO
+CREATE PROCEDURE dbo.sp_Enrollment_GetByOffering
+    @OfferingID INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT EnrollmentID, StudentID, OfferingID, Grade, EnrollmentDate
+    FROM dbo.Enrollments
+    WHERE OfferingID = @OfferingID;
+END;
+GO
+
+IF OBJECT_ID('dbo.sp_Enrollment_GetFailing', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_Enrollment_GetFailing;
+GO
+CREATE PROCEDURE dbo.sp_Enrollment_GetFailing
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT EnrollmentID, StudentID, OfferingID, Grade, EnrollmentDate
+    FROM dbo.Enrollments
+    WHERE Grade = 'F';
+END;
+GO
+
+IF OBJECT_ID('dbo.sp_Enrollment_GetAllCourseOfferings', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_Enrollment_GetAllCourseOfferings;
+GO
+CREATE PROCEDURE dbo.sp_Enrollment_GetAllCourseOfferings
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT OfferingID, CourseID, SemesterID, MaxCapacity, CurrentEnrollment
+    FROM dbo.CourseOfferings;
+END;
+GO
+
+IF OBJECT_ID('dbo.sp_Enrollment_GetCourseOfferingById', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_Enrollment_GetCourseOfferingById;
+GO
+CREATE PROCEDURE dbo.sp_Enrollment_GetCourseOfferingById
+    @OfferingID INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT OfferingID, CourseID, SemesterID, MaxCapacity, CurrentEnrollment
+    FROM dbo.CourseOfferings
+    WHERE OfferingID = @OfferingID;
+END;
+GO
+
+IF OBJECT_ID('dbo.sp_Enrollment_GetAvailableCourseOfferings', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_Enrollment_GetAvailableCourseOfferings;
+GO
+CREATE PROCEDURE dbo.sp_Enrollment_GetAvailableCourseOfferings
+    @SemesterID INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT
+        OfferingID,
+        CourseID,
+        SemesterID,
+        MaxCapacity,
+        CurrentEnrollment
+    FROM dbo.vw_AvailableCourseOfferings
+    WHERE SemesterID = @SemesterID;
+END;
+GO
+
+IF OBJECT_ID('dbo.sp_Enrollment_AddCourseOffering', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_Enrollment_AddCourseOffering;
+GO
+CREATE PROCEDURE dbo.sp_Enrollment_AddCourseOffering
+    @CourseID          INT,
+    @SemesterID        INT,
+    @MaxCapacity       INT,
+    @CurrentEnrollment INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    INSERT INTO dbo.CourseOfferings (CourseID, SemesterID, MaxCapacity, CurrentEnrollment)
+    VALUES (@CourseID, @SemesterID, @MaxCapacity, @CurrentEnrollment);
+END;
+GO
+
+IF OBJECT_ID('dbo.sp_Enrollment_UpdateCourseOffering', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_Enrollment_UpdateCourseOffering;
+GO
+CREATE PROCEDURE dbo.sp_Enrollment_UpdateCourseOffering
+    @OfferingID        INT,
+    @CourseID          INT,
+    @SemesterID        INT,
+    @MaxCapacity       INT,
+    @CurrentEnrollment INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    UPDATE dbo.CourseOfferings
+    SET CourseID          = @CourseID,
+        SemesterID        = @SemesterID,
+        MaxCapacity       = @MaxCapacity,
+        CurrentEnrollment = @CurrentEnrollment
+    WHERE OfferingID = @OfferingID;
+END;
+GO
+
+IF OBJECT_ID('dbo.sp_Enrollment_DeleteCourseOffering', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_Enrollment_DeleteCourseOffering;
+GO
+CREATE PROCEDURE dbo.sp_Enrollment_DeleteCourseOffering
+    @OfferingID INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DELETE FROM dbo.CourseOfferings
+    WHERE OfferingID = @OfferingID;
+END;
+GO
+
+IF OBJECT_ID('dbo.sp_AuditGradeChanges_GetLog', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_AuditGradeChanges_GetLog;
+GO
+CREATE PROCEDURE dbo.sp_AuditGradeChanges_GetLog
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT TOP 1000
+        AuditID,
+        EnrollmentID,
+        EnrollmentDate,
+        OldGrade,
+        NewGrade,
+        ChangeDate
+    FROM dbo.Audit_GradeChanges
+    ORDER BY ChangeDate DESC;
+END;
+GO
+
+---------------------------------------------------------------
+-- Semester stored procedures
+---------------------------------------------------------------
+IF OBJECT_ID('dbo.sp_Semester_GetAll', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_Semester_GetAll;
+GO
+CREATE PROCEDURE dbo.sp_Semester_GetAll
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT SemesterID, [Year], Season
+    FROM dbo.Semesters
+    ORDER BY [Year] DESC, Season;
+END;
+GO
+
+IF OBJECT_ID('dbo.sp_Semester_GetById', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_Semester_GetById;
+GO
+CREATE PROCEDURE dbo.sp_Semester_GetById
+    @SemesterID INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT SemesterID, [Year], Season
+    FROM dbo.Semesters
+    WHERE SemesterID = @SemesterID;
+END;
+GO
+
+IF OBJECT_ID('dbo.sp_Semester_Add', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_Semester_Add;
+GO
+CREATE PROCEDURE dbo.sp_Semester_Add
+    @Year   INT,
+    @Season NVARCHAR(50)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    INSERT INTO dbo.Semesters ([Year], Season)
+    VALUES (@Year, @Season);
+END;
+GO
+
+IF OBJECT_ID('dbo.sp_Semester_Update', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_Semester_Update;
+GO
+CREATE PROCEDURE dbo.sp_Semester_Update
+    @SemesterID INT,
+    @Year       INT,
+    @Season     NVARCHAR(50)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    UPDATE dbo.Semesters
+    SET [Year] = @Year,
+        Season = @Season
+    WHERE SemesterID = @SemesterID;
+END;
+GO
+
+IF OBJECT_ID('dbo.sp_Semester_Delete', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_Semester_Delete;
+GO
+CREATE PROCEDURE dbo.sp_Semester_Delete
+    @SemesterID INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DELETE FROM dbo.Semesters
+    WHERE SemesterID = @SemesterID;
+END;
+GO
+
+IF OBJECT_ID('dbo.sp_Semester_GetCurrent', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_Semester_GetCurrent;
+GO
+CREATE PROCEDURE dbo.sp_Semester_GetCurrent
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT TOP 1 SemesterID, [Year], Season
+    FROM dbo.Semesters
+    ORDER BY [Year] DESC, Season DESC;
+END;
+GO
+
+IF OBJECT_ID('dbo.sp_Semester_GetRecent', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_Semester_GetRecent;
+GO
+CREATE PROCEDURE dbo.sp_Semester_GetRecent
+    @Count INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT TOP (@Count)
+        SemesterID, [Year], Season
+    FROM dbo.Semesters
+    ORDER BY [Year] DESC, Season DESC;
+END;
+GO
+
+---------------------------------------------------------------
+-- StudentHold stored procedures
+---------------------------------------------------------------
+IF OBJECT_ID('dbo.sp_StudentHold_GetAll', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_StudentHold_GetAll;
+GO
+CREATE PROCEDURE dbo.sp_StudentHold_GetAll
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT HoldID, StudentID, HoldType, Reason, DateApplied, IsActive
+    FROM dbo.StudentHolds;
+END;
+GO
+
+IF OBJECT_ID('dbo.sp_StudentHold_GetById', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_StudentHold_GetById;
+GO
+CREATE PROCEDURE dbo.sp_StudentHold_GetById
+    @HoldID INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT HoldID, StudentID, HoldType, Reason, DateApplied, IsActive
+    FROM dbo.StudentHolds
+    WHERE HoldID = @HoldID;
+END;
+GO
+
+IF OBJECT_ID('dbo.sp_StudentHold_Add', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_StudentHold_Add;
+GO
+CREATE PROCEDURE dbo.sp_StudentHold_Add
+    @StudentID   INT,
+    @HoldType    NVARCHAR(50),
+    @Reason      NVARCHAR(MAX) = NULL,
+    @DateApplied DATETIME2(0),
+    @IsActive    BIT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    INSERT INTO dbo.StudentHolds (StudentID, HoldType, Reason, DateApplied, IsActive)
+    VALUES (@StudentID, @HoldType, @Reason, @DateApplied, @IsActive);
+END;
+GO
+
+IF OBJECT_ID('dbo.sp_StudentHold_Update', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_StudentHold_Update;
+GO
+CREATE PROCEDURE dbo.sp_StudentHold_Update
+    @HoldID      INT,
+    @StudentID   INT,
+    @HoldType    NVARCHAR(50),
+    @Reason      NVARCHAR(MAX) = NULL,
+    @DateApplied DATETIME2(0),
+    @IsActive    BIT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    UPDATE dbo.StudentHolds
+    SET StudentID   = @StudentID,
+        HoldType    = @HoldType,
+        Reason      = @Reason,
+        DateApplied = @DateApplied,
+        IsActive    = @IsActive
+    WHERE HoldID = @HoldID;
+END;
+GO
+
+IF OBJECT_ID('dbo.sp_StudentHold_Delete', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_StudentHold_Delete;
+GO
+CREATE PROCEDURE dbo.sp_StudentHold_Delete
+    @HoldID INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DELETE FROM dbo.StudentHolds
+    WHERE HoldID = @HoldID;
+END;
+GO
+
+IF OBJECT_ID('dbo.sp_StudentHold_GetActiveForStudent', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_StudentHold_GetActiveForStudent;
+GO
+CREATE PROCEDURE dbo.sp_StudentHold_GetActiveForStudent
+    @StudentID INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT HoldID, StudentID, HoldType, Reason, DateApplied, IsActive
+    FROM dbo.StudentHolds
+    WHERE StudentID = @StudentID
+      AND IsActive  = 1;
+END;
+GO
+
+IF OBJECT_ID('dbo.sp_StudentHold_HasActive', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_StudentHold_HasActive;
+GO
+CREATE PROCEDURE dbo.sp_StudentHold_HasActive
+    @StudentID INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT CASE WHEN EXISTS (
+        SELECT 1
+        FROM dbo.StudentHolds
+        WHERE StudentID = @StudentID
+          AND IsActive  = 1
+    ) THEN 1 ELSE 0 END AS HasActive;
+END;
+GO
+
+---------------------------------------------------------------
+-- Student stored procedures
+---------------------------------------------------------------
+IF OBJECT_ID('dbo.sp_Student_GetAll', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_Student_GetAll;
+GO
+CREATE PROCEDURE dbo.sp_Student_GetAll
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT StudentID, FirstName, LastName, Email, EnrollmentStatus, DateOfBirth
+    FROM dbo.Students
+    ORDER BY LastName, FirstName;
+END;
+GO
+
+IF OBJECT_ID('dbo.sp_Student_GetById', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_Student_GetById;
+GO
+CREATE PROCEDURE dbo.sp_Student_GetById
+    @StudentID INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT StudentID, FirstName, LastName, Email, EnrollmentStatus, DateOfBirth
+    FROM dbo.Students
+    WHERE StudentID = @StudentID;
+END;
+GO
+
+IF OBJECT_ID('dbo.sp_Student_GetByEmail', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_Student_GetByEmail;
+GO
+CREATE PROCEDURE dbo.sp_Student_GetByEmail
+    @Email NVARCHAR(255)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT StudentID, FirstName, LastName, Email, EnrollmentStatus, DateOfBirth
+    FROM dbo.Students
+    WHERE Email = @Email;
+END;
+GO
+
+IF OBJECT_ID('dbo.sp_Student_Add', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_Student_Add;
+GO
+CREATE PROCEDURE dbo.sp_Student_Add
+    @FirstName        NVARCHAR(255),
+    @LastName         NVARCHAR(255),
+    @Email            NVARCHAR(255),
+    @EnrollmentStatus NVARCHAR(50),
+    @DateOfBirth      DATE = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    INSERT INTO dbo.Students (FirstName, LastName, Email, EnrollmentStatus, DateOfBirth)
+    VALUES (@FirstName, @LastName, @Email, @EnrollmentStatus, @DateOfBirth);
+END;
+GO
+
+IF OBJECT_ID('dbo.sp_Student_Update', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_Student_Update;
+GO
+CREATE PROCEDURE dbo.sp_Student_Update
+    @StudentID        INT,
+    @FirstName        NVARCHAR(255),
+    @LastName         NVARCHAR(255),
+    @Email            NVARCHAR(255),
+    @EnrollmentStatus NVARCHAR(50),
+    @DateOfBirth      DATE = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    UPDATE dbo.Students
+    SET FirstName        = @FirstName,
+        LastName         = @LastName,
+        Email            = @Email,
+        EnrollmentStatus = @EnrollmentStatus,
+        DateOfBirth      = @DateOfBirth
+    WHERE StudentID = @StudentID;
+END;
+GO
+
+IF OBJECT_ID('dbo.sp_Student_Delete', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_Student_Delete;
+GO
+CREATE PROCEDURE dbo.sp_Student_Delete
+    @StudentID INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- trg_InsteadOf_DeleteStudent will turn this into a soft delete
+    DELETE FROM dbo.Students
+    WHERE StudentID = @StudentID;
+END;
+GO
+
+IF OBJECT_ID('dbo.sp_Student_GetActive', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_Student_GetActive;
+GO
+CREATE PROCEDURE dbo.sp_Student_GetActive
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT StudentID, FirstName, LastName, Email, EnrollmentStatus, DateOfBirth
+    FROM dbo.Students
+    WHERE EnrollmentStatus = 'Active';
+END;
+GO
+
+IF OBJECT_ID('dbo.sp_Student_Search', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_Student_Search;
+GO
+CREATE PROCEDURE dbo.sp_Student_Search
+    @SearchTerm NVARCHAR(255)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT StudentID, FirstName, LastName, Email, EnrollmentStatus, DateOfBirth
+    FROM dbo.Students
+    WHERE FirstName LIKE '%' + @SearchTerm + '%'
+       OR LastName  LIKE '%' + @SearchTerm + '%'
+       OR Email     LIKE '%' + @SearchTerm + '%';
+END;
+GO
+
+IF OBJECT_ID('dbo.sp_Student_GetGPA', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_Student_GetGPA;
+GO
+CREATE PROCEDURE dbo.sp_Student_GetGPA
+    @StudentID INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT dbo.fn_CalculateGPA(@StudentID) AS GPA;
+END;
+GO
+
+IF OBJECT_ID('dbo.sp_Student_GetTranscript', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_Student_GetTranscript;
+GO
+CREATE PROCEDURE dbo.sp_Student_GetTranscript
+    @StudentID INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT
+        vt.StudentID,
+        vt.FirstName,
+        vt.LastName,
+        vt.CourseCode,
+        vt.CourseTitle,
+        vt.Credits,
+        vt.[Year],
+        vt.Season,
+        vt.Grade
+    FROM dbo.vw_StudentTranscript vt
+    WHERE vt.StudentID = @StudentID
+    ORDER BY vt.[Year], vt.Season;
+END;
+GO
+
+
 /* ===========================================================
    4. TRIGGERS
    =========================================================== */
 
+-------------------------------
+-- 4.1 trg_After_GradeUpdate on Enrollments
+-------------------------------
 IF OBJECT_ID('dbo.trg_After_GradeUpdate', 'TR') IS NOT NULL
     DROP TRIGGER dbo.trg_After_GradeUpdate;
 GO
+
 CREATE TRIGGER dbo.trg_After_GradeUpdate
 ON dbo.Enrollments
 AFTER UPDATE
@@ -809,24 +1994,28 @@ BEGIN
         RETURN;
 
     INSERT INTO dbo.Audit_GradeChanges
-        (EnrollmentID, EnrollmentDate, OldGrade, NewGrade, ChangedByLogin)
+        (EnrollmentID, EnrollmentDate, OldGrade, NewGrade)
     SELECT
         i.EnrollmentID,
         i.EnrollmentDate,
         d.Grade AS OldGrade,
-        i.Grade AS NewGrade,
-        SYSTEM_USER
+        i.Grade AS NewGrade
     FROM inserted AS i
     JOIN deleted  AS d
         ON i.EnrollmentID   = d.EnrollmentID
        AND i.EnrollmentDate = d.EnrollmentDate
-    WHERE ISNULL(d.Grade,'') <> ISNULL(i.Grade,'');
+    WHERE ISNULL(d.Grade, '') <> ISNULL(i.Grade, '');  -- ignore no-op updates
 END;
 GO
 
+
+-------------------------------
+-- 4.2 trg_InsteadOf_DeleteStudent on Students
+-------------------------------
 IF OBJECT_ID('dbo.trg_InsteadOf_DeleteStudent', 'TR') IS NOT NULL
     DROP TRIGGER dbo.trg_InsteadOf_DeleteStudent;
 GO
+
 CREATE TRIGGER dbo.trg_InsteadOf_DeleteStudent
 ON dbo.Students
 INSTEAD OF DELETE
@@ -834,11 +2023,14 @@ AS
 BEGIN
     SET NOCOUNT ON;
 
+    -- Soft delete: mark as Inactive instead of physical delete
     UPDATE s
     SET EnrollmentStatus = 'Inactive'
     FROM dbo.Students AS s
     JOIN deleted      AS d
         ON s.StudentID = d.StudentID;
+
+    -- Optionally, more logic (e.g., cancel future enrollments) can go here
 END;
 GO
 
@@ -846,6 +2038,7 @@ GO
    5. SUPPORTING INDEXES (FK + FILTERED)
    =========================================================== */
 
+-- Foreign-key helper indexes
 IF NOT EXISTS (
     SELECT 1 FROM sys.indexes
     WHERE name = 'IX_Enrollments_StudentID'
@@ -890,6 +2083,7 @@ BEGIN
 END;
 GO
 
+-- Filtered failing-courses index
 IF NOT EXISTS (
     SELECT 1 FROM sys.indexes
     WHERE name = 'IX_Enrollments_Failing'
@@ -902,6 +2096,7 @@ BEGIN
 END;
 GO
 
+-- Filtered active students index (if not already present)
 IF NOT EXISTS (
     SELECT 1 FROM sys.indexes
     WHERE name = 'IX_Students_Active'
@@ -914,9 +2109,7 @@ BEGIN
 END;
 GO
 
-/* ===========================================================
-   6. DATA POPULATION (combined, keeps your SQL-Edge-safe courses)
-   =========================================================== */
+
 
 USE StudentManagementDB;
 GO
@@ -925,7 +2118,7 @@ SET NOCOUNT ON;
 PRINT '--- STARTING DATA POPULATION ---';
 
 ---------------------------------------------------------------
--- 1. Departments
+-- 1. Departments (small, hierarchical)
 ---------------------------------------------------------------
 PRINT 'Step 1: Inserting Departments...';
 
@@ -933,7 +2126,7 @@ IF NOT EXISTS (SELECT 1 FROM dbo.Departments)
 BEGIN
     INSERT INTO dbo.Departments (DepartmentName, ParentDepartmentID)
     VALUES
-        ('College of Engineering', NULL),
+        ('College of Engineering', NULL),  -- parent
         ('Computer Science', 1),
         ('Electrical Engineering', 1),
         ('Mechanical Engineering', 1),
@@ -942,12 +2135,13 @@ END;
 GO
 
 ---------------------------------------------------------------
--- 2. Semesters
+-- 2. Semesters (small reference set)
 ---------------------------------------------------------------
 PRINT 'Step 2: Inserting Semesters...';
 
 IF NOT EXISTS (SELECT 1 FROM dbo.Semesters)
 BEGIN
+    -- Years 2021–2025, 3 seasons each
     INSERT INTO dbo.Semesters ([Year], Season)
     VALUES
         (2021, 'Spring'), (2021, 'Summer'), (2021, 'Fall'),
@@ -959,34 +2153,34 @@ END;
 GO
 
 ---------------------------------------------------------------
--- 3. Courses (SQL Edge compatible insertion)
+-- 3. Courses (~500)
 ---------------------------------------------------------------
 PRINT 'Step 3: Inserting Courses...';
 
--- You had DELETE in the old working script; keep it to ensure deterministic reruns
-DELETE FROM dbo.Courses;
+IF NOT EXISTS (SELECT 1 FROM dbo.Courses)
+BEGIN
+    DECLARE @DeptCount INT  = (SELECT COUNT(*) FROM dbo.Departments);
+    DECLARE @MinDeptID INT  = (SELECT MIN(DepartmentID) FROM dbo.Departments);
 
-;WITH Numbers AS (
-    SELECT TOP (500)
-        ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS n
-    FROM (VALUES(1),(2),(3),(4),(5),(6),(7),(8),(9),(10)) a(n)
-    CROSS JOIN (VALUES(1),(2),(3),(4),(5),(6),(7),(8),(9),(10)) b(n)
-    CROSS JOIN (VALUES(1),(2),(3),(4),(5)) c(n)
-)
-INSERT INTO dbo.Courses (CourseCode, Title, [Description], Credits, DepartmentID)
-SELECT
-    CONCAT('C', RIGHT('0000' + CAST(n AS VARCHAR(4)), 4)),
-    CONCAT('Course ', n),
-    CONCAT('Description for course ', n),
-    (n % 6) + 1,
-    1 + (n % 5)
-FROM Numbers;
-
-PRINT 'Courses inserted.';
+    ;WITH Numbers AS (
+        SELECT TOP (500)
+            ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS n
+        FROM sys.all_objects a
+        CROSS JOIN sys.all_objects b
+    )
+    INSERT INTO dbo.Courses (CourseCode, Title, [Description], Credits, DepartmentID)
+    SELECT
+        CONCAT('C', FORMAT(n, '0000')) AS CourseCode,
+        CONCAT('Course ', n) AS Title,
+        CONCAT('Description for course ', n) AS [Description],
+        (n % 6) + 1 AS Credits,                  -- 1–6
+        @MinDeptID + ((n - 1) % @DeptCount)     -- spread across departments
+    FROM Numbers;
+END;
 GO
 
 ---------------------------------------------------------------
--- 4. Course Prerequisites
+-- 4. Course Prerequisites (chain for first ~300 courses)
 ---------------------------------------------------------------
 PRINT 'Step 4: Inserting CoursePrerequisites...';
 
@@ -1001,7 +2195,7 @@ END;
 GO
 
 ---------------------------------------------------------------
--- 5. Course Offerings
+-- 5. Course Offerings (~Courses x Semesters)
 ---------------------------------------------------------------
 PRINT 'Step 5: Inserting CourseOfferings...';
 
@@ -1011,15 +2205,15 @@ BEGIN
     SELECT
         c.CourseID,
         s.SemesterID,
-        50 + (ABS(CHECKSUM(c.CourseID, s.SemesterID)) % 151),
-        0
+        50 + (ABS(CHECKSUM(c.CourseID, s.SemesterID)) % 151) AS MaxCapacity,  -- 50–200
+        0 AS CurrentEnrollment
     FROM dbo.Courses   AS c
     CROSS JOIN dbo.Semesters AS s;
 END;
 GO
 
 ---------------------------------------------------------------
--- 6. Students
+-- 6. Students (~100,000)
 ---------------------------------------------------------------
 PRINT 'Step 6: Inserting Students (~100k)...';
 
@@ -1033,22 +2227,22 @@ BEGIN
     )
     INSERT INTO dbo.Students (FirstName, LastName, Email, EnrollmentStatus, DateOfBirth)
     SELECT
-        CONCAT('First', n),
-        CONCAT('Last',  n),
-        CONCAT('student', n, '@univ.edu'),
+        CONCAT('First', n) AS FirstName,
+        CONCAT('Last',  n) AS LastName,
+        CONCAT('student', n, '@univ.edu') AS Email,
         CASE (n % 4)
             WHEN 0 THEN 'Active'
             WHEN 1 THEN 'Inactive'
             WHEN 2 THEN 'Graduated'
             ELSE 'Suspended'
-        END,
-        DATEADD(DAY, -(n % 10000), CAST('2005-01-01' AS DATE))
+        END AS EnrollmentStatus,
+        DATEADD(DAY, -(n % 10000), CAST('2005-01-01' AS DATE)) AS DateOfBirth
     FROM Numbers;
 END;
 GO
 
 ---------------------------------------------------------------
--- 7. Enrollments
+-- 7. Enrollments (~900,000)
 ---------------------------------------------------------------
 PRINT 'Step 7: Inserting Enrollments (~900k)...';
 
@@ -1059,10 +2253,14 @@ BEGIN
     DECLARE @MinStudentID    INT  = (SELECT MIN(StudentID) FROM dbo.Students);
     DECLARE @MinOfferingID   INT  = (SELECT MIN(OfferingID) FROM dbo.CourseOfferings);
 
+    -- Target total enrollments (make sure it's less than StudentCount * OfferingCount)
     DECLARE @TotalEnrollments INT = 900000;
 
     IF @StudentCount * @OfferingCount < @TotalEnrollments
+    BEGIN
+        -- Safety fallback if there aren't enough combinations
         SET @TotalEnrollments = @StudentCount * @OfferingCount;
+    END;
 
     ;WITH Numbers AS (
         SELECT TOP (@TotalEnrollments)
@@ -1072,8 +2270,8 @@ BEGIN
     )
     INSERT INTO dbo.Enrollments (StudentID, OfferingID, Grade, EnrollmentDate)
     SELECT
-        @MinStudentID + (n % @StudentCount),
-        @MinOfferingID + (n / @StudentCount),
+        @MinStudentID + (n % @StudentCount)    AS StudentID,
+        @MinOfferingID + (n / @StudentCount)   AS OfferingID,
         CASE (ABS(CHECKSUM(n)) % 10)
             WHEN 0 THEN 'A'
             WHEN 1 THEN 'A'
@@ -1083,15 +2281,15 @@ BEGIN
             WHEN 5 THEN 'C'
             WHEN 6 THEN 'D'
             WHEN 7 THEN 'F'
-            ELSE NULL
-        END,
-        DATEADD(DAY, -(n % 1460), CAST(GETDATE() AS DATE))
+            ELSE NULL      -- some courses "in progress"
+        END AS Grade,
+        DATEADD(DAY, -(n % 1460), CAST(GETDATE() AS DATE)) AS EnrollmentDate  -- within last ~4 years
     FROM Numbers;
 END;
 GO
 
 ---------------------------------------------------------------
--- 8. Student Holds
+-- 8. Student Holds (~5,000)
 ---------------------------------------------------------------
 PRINT 'Step 8: Inserting StudentHolds (~5k)...';
 
@@ -1105,28 +2303,29 @@ BEGIN
             WHEN 1 THEN 'Academic'
             WHEN 2 THEN 'Disciplinary'
             ELSE 'Administrative'
-        END,
+        END AS HoldType,
         CASE (s.StudentID % 4)
             WHEN 0 THEN 'Outstanding tuition balance'
             WHEN 1 THEN 'GPA below threshold'
             WHEN 2 THEN 'Code of conduct violation'
             ELSE 'Administrative review pending'
-        END
+        END AS Reason
     FROM dbo.Students AS s
-    WHERE s.StudentID % 20 = 0
+    WHERE s.StudentID % 20 = 0        -- sparse subset of students
     ORDER BY s.StudentID;
 END;
 GO
 
 ---------------------------------------------------------------
--- 9. Audit_GradeChanges seed rows (~20k)
+-- 9. Audit_GradeChanges (~20,000)
 ---------------------------------------------------------------
 PRINT 'Step 9: Inserting Audit_GradeChanges (~20k)...';
 
 IF NOT EXISTS (SELECT 1 FROM dbo.Audit_GradeChanges)
 BEGIN
+    -- Take a subset of enrollments that have a non-NULL grade
     INSERT INTO dbo.Audit_GradeChanges
-        (EnrollmentID, EnrollmentDate, OldGrade, NewGrade, ChangedByLogin)
+        (EnrollmentID, EnrollmentDate, OldGrade, NewGrade)
     SELECT TOP (20000)
         e.EnrollmentID,
         e.EnrollmentDate,
@@ -1137,33 +2336,37 @@ BEGIN
             WHEN 'D' THEN 'F'
             WHEN 'F' THEN 'F'
             ELSE NULL
-        END,
-        e.Grade,
-        SYSTEM_USER
+        END AS OldGrade,
+        e.Grade AS NewGrade
     FROM dbo.Enrollments AS e
     WHERE e.Grade IS NOT NULL
     ORDER BY e.EnrollmentID;
 END;
 GO
 
+
 ---------------------------------------------------------------
--- 10. Summary
+-- 10. Summary (fixed)
 ---------------------------------------------------------------
 PRINT 'Step 10: Summary row counts...';
 
-SELECT 'Departments'        AS TableName, COUNT(*) AS Cnt FROM dbo.Departments
-UNION ALL SELECT 'Semesters',          COUNT(*) FROM dbo.Semesters
-UNION ALL SELECT 'Courses',            COUNT(*) FROM dbo.Courses
-UNION ALL SELECT 'CoursePrereqs',      COUNT(*) FROM dbo.CoursePrerequisites
-UNION ALL SELECT 'CourseOfferings',    COUNT(*) FROM dbo.CourseOfferings
-UNION ALL SELECT 'Students',           COUNT(*) FROM dbo.Students
-UNION ALL SELECT 'Enrollments',        COUNT(*) FROM dbo.Enrollments
-UNION ALL SELECT 'StudentHolds',       COUNT(*) FROM dbo.StudentHolds
-UNION ALL SELECT 'Audit_GradeChanges', COUNT(*) FROM dbo.Audit_GradeChanges;
+SELECT 'Departments'        AS TableName, COUNT(*) FROM dbo.Departments
+UNION ALL
+SELECT 'Semesters'          AS TableName, COUNT(*) FROM dbo.Semesters
+UNION ALL
+SELECT 'Courses'            AS TableName, COUNT(*) FROM dbo.Courses
+UNION ALL
+SELECT 'CoursePrereqs'      AS TableName, COUNT(*) FROM dbo.CoursePrerequisites
+UNION ALL
+SELECT 'CourseOfferings'    AS TableName, COUNT(*) FROM dbo.CourseOfferings
+UNION ALL
+SELECT 'Students'           AS TableName, COUNT(*) FROM dbo.Students
+UNION ALL
+SELECT 'Enrollments'        AS TableName, COUNT(*) FROM dbo.Enrollments
+UNION ALL
+SELECT 'StudentHolds'       AS TableName, COUNT(*) FROM dbo.StudentHolds
+UNION ALL
+SELECT 'Audit_GradeChanges' AS TableName, COUNT(*) FROM dbo.Audit_GradeChanges;
 GO
 
 PRINT '--- DATA POPULATION COMPLETE ---';
-GO
-
-PRINT '=== DONE: StudentManagementDB fully created + populated ===';
-GO
