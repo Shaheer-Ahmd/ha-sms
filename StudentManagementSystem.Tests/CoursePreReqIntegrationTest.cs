@@ -1,26 +1,43 @@
 using Xunit;
 using Microsoft.Data.SqlClient;
+using System;
 
 namespace StudentManagementSystem.Tests
 {
     public class CoursePrerequisiteIntegrationTests : TestBase
     {
+        private int CreateTestCourse(SqlConnection c)
+        {
+            var cmd = new SqlCommand(@"
+                INSERT INTO Courses (CourseCode, Title, Credits, DepartmentID)
+                VALUES (@Code, 'Test Course', 3, 1);
+
+                SELECT CAST(SCOPE_IDENTITY() AS INT);
+            ", c);
+
+            cmd.Parameters.AddWithValue("@Code", Guid.NewGuid().ToString("N").Substring(0, 8));
+            return (int)cmd.ExecuteScalar();
+        }
+
         [Fact]
         public void Can_Add_Course_Prerequisite()
         {
             using var c = Open();
 
-            var cmd = new SqlCommand(@"
-                DECLARE @course INT = (SELECT MIN(CourseID) FROM Courses);
-                DECLARE @prereq INT = @course + 1;
+            int course = CreateTestCourse(c);
+            int prereq = CreateTestCourse(c);
 
+            var cmd = new SqlCommand(@"
                 EXEC dbo.sp_CoursePrerequisite_Add @course, @prereq;
 
-                SELECT COUNT(*) 
+                SELECT COUNT(*)
                 FROM CoursePrerequisites
                 WHERE CourseID = @course
                   AND PrerequisiteCourseID = @prereq;
             ", c);
+
+            cmd.Parameters.AddWithValue("@course", course);
+            cmd.Parameters.AddWithValue("@prereq", prereq);
 
             int count = (int)cmd.ExecuteScalar();
             Assert.Equal(1, count);
@@ -31,10 +48,13 @@ namespace StudentManagementSystem.Tests
         {
             using var c = Open();
 
+            int course = CreateTestCourse(c);
+
             var cmd = new SqlCommand(@"
-                DECLARE @course INT = (SELECT MIN(CourseID) FROM Courses);
                 EXEC dbo.sp_CoursePrerequisite_Add @course, @course;
             ", c);
+
+            cmd.Parameters.AddWithValue("@course", course);
 
             Assert.Throws<SqlException>(() => cmd.ExecuteNonQuery());
         }
@@ -44,21 +64,24 @@ namespace StudentManagementSystem.Tests
         {
             using var c = Open();
 
+            int course = CreateTestCourse(c);
+            int prereq = CreateTestCourse(c);
+
             var cmd = new SqlCommand(@"
-                DECLARE @course INT = (SELECT MIN(CourseID) FROM Courses);
-                DECLARE @prereq INT = @course + 1;
-
                 EXEC dbo.sp_CoursePrerequisite_Add @course, @prereq;
                 EXEC dbo.sp_CoursePrerequisite_Add @course, @prereq;
 
-                SELECT COUNT(*) 
+                SELECT COUNT(*)
                 FROM CoursePrerequisites
                 WHERE CourseID = @course
                   AND PrerequisiteCourseID = @prereq;
             ", c);
 
+            cmd.Parameters.AddWithValue("@course", course);
+            cmd.Parameters.AddWithValue("@prereq", prereq);
+
             int count = (int)cmd.ExecuteScalar();
-            Assert.Equal(1, count); 
+            Assert.Equal(1, count);
         }
 
         [Fact]
@@ -66,13 +89,16 @@ namespace StudentManagementSystem.Tests
         {
             using var c = Open();
 
-            var cmd = new SqlCommand(@"
-                DECLARE @c1 INT = (SELECT MIN(CourseID) FROM Courses);
-                DECLARE @c2 INT = @c1 + 1;
+            int c1 = CreateTestCourse(c);
+            int c2 = CreateTestCourse(c);
 
+            var cmd = new SqlCommand(@"
                 EXEC dbo.sp_CoursePrerequisite_Add @c1, @c2;
                 EXEC dbo.sp_CoursePrerequisite_Add @c2, @c1;
             ", c);
+
+            cmd.Parameters.AddWithValue("@c1", c1);
+            cmd.Parameters.AddWithValue("@c2", c2);
 
             Assert.Throws<SqlException>(() => cmd.ExecuteNonQuery());
         }
