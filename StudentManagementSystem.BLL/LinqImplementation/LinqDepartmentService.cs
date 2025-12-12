@@ -66,27 +66,71 @@ namespace StudentManagementSystem.BLL.LinqImplementation
             }
         }
 
-        // Uses sp_GetDepartmentHierarchy with recursive CTE
-        public DataTable GetDepartmentHierarchy()
+public DataTable GetDepartmentHierarchy()
+{
+    using (var context = new StudentManagementContext(_connectionString))
+    {
+        // 1) Load all departments
+        var departments = context.Departments.ToList();
+
+        // 2) Prepare result DataTable (same schema as sp_GetDepartmentHierarchy)
+        var table = new DataTable();
+        table.Columns.Add("DepartmentID", typeof(int));
+        table.Columns.Add("IndentedName", typeof(string));
+        table.Columns.Add("Level", typeof(int));
+        table.Columns.Add("HierarchyPath", typeof(string));
+
+        // 3) Roots: ParentDepartmentID == null
+        var roots = departments
+            .Where(d => d.ParentDepartmentID == null)
+            .OrderBy(d => d.DepartmentName)
+            .ToList();
+
+        // 4) Children lookup: key is NON-NULL parent ID
+        var childrenLookup = departments
+            .Where(d => d.ParentDepartmentID != null)
+            .GroupBy(d => d.ParentDepartmentID!.Value)
+            .ToDictionary(
+                g => g.Key,                            // parent DepartmentID
+                g => g.OrderBy(x => x.DepartmentName)  // children ordered by name
+                      .ToList()
+            );
+
+        // 5) Recursive traversal
+        void Traverse(Department dept, int level, string parentPath)
         {
-            var dataTable = new DataTable();
-            using (var context = new StudentManagementContext(_connectionString))
+            var hierarchyPath = string.IsNullOrEmpty(parentPath)
+                ? dept.DepartmentName
+                : parentPath + " > " + dept.DepartmentName;
+
+            var indentedName = new string(' ', level * 4) + dept.DepartmentName;
+
+            table.Rows.Add(
+                dept.DepartmentID,
+                indentedName,
+                level,
+                hierarchyPath
+            );
+
+            if (childrenLookup.TryGetValue(dept.DepartmentID, out var children))
             {
-                using (var conn = new SqlConnection(_connectionString))
+                foreach (var child in children)
                 {
-                    conn.Open();
-                    using (var cmd = new SqlCommand("sp_GetDepartmentHierarchy", conn))
-                    {
-                        cmd.CommandType = CommandType.StoredProcedure;
-                        using (var adapter = new SqlDataAdapter(cmd))
-                        {
-                            adapter.Fill(dataTable);
-                        }
-                    }
+                    Traverse(child, level + 1, hierarchyPath);
                 }
             }
-            return dataTable;
         }
+
+        // 6) Kick off from roots
+        foreach (var root in roots)
+        {
+            Traverse(root, level: 0, parentPath: string.Empty);
+        }
+
+        return table;
+    }
+}
+
 
         public List<Department> GetActiveDepartments()
         {
