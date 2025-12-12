@@ -721,6 +721,77 @@ END;
 GO
 
 /* ===========================================================
+    Course Prerequisite Stored Procedures
+   =========================================================== */
+
+IF OBJECT_ID('dbo.sp_CoursePrerequisite_Add', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_CoursePrerequisite_Add;
+GO
+CREATE PROCEDURE dbo.sp_CoursePrerequisite_Add
+    @CourseID INT,
+    @PrereqID INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- No self-reference
+    IF @CourseID = @PrereqID
+    BEGIN
+        RAISERROR('A course cannot be its own prerequisite.', 16, 1);
+        RETURN;
+    END
+
+    -- Prevent duplicates
+    IF EXISTS (
+        SELECT 1
+        FROM dbo.CoursePrerequisites
+        WHERE CourseID = @CourseID
+          AND PrerequisiteCourseID = @PrereqID
+    )
+        RETURN;
+
+    -- Prevent circular dependency
+    BEGIN
+        ;WITH PrereqChain AS (
+            SELECT @PrereqID AS CourseID
+            UNION ALL
+            SELECT cp.PrerequisiteCourseID
+            FROM dbo.CoursePrerequisites cp
+            JOIN PrereqChain pc ON cp.CourseID = pc.CourseID
+        )
+        SELECT 1
+        FROM PrereqChain
+        WHERE CourseID = @CourseID;
+
+        IF @@ROWCOUNT > 0
+        BEGIN
+            RAISERROR('Circular prerequisite detected.', 16, 1);
+            RETURN;
+        END
+    END
+
+    INSERT INTO dbo.CoursePrerequisites (CourseID, PrerequisiteCourseID)
+    VALUES (@CourseID, @PrereqID);
+END;
+GO
+
+IF OBJECT_ID('dbo.sp_CoursePrerequisite_Remove', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_CoursePrerequisite_Remove;
+GO
+CREATE PROCEDURE dbo.sp_CoursePrerequisite_Remove
+    @CourseID INT,
+    @PrereqID INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DELETE FROM dbo.CoursePrerequisites
+    WHERE CourseID = @CourseID
+      AND PrerequisiteCourseID = @PrereqID;
+END;
+GO
+
+/* ===========================================================
    4. TRIGGERS
    =========================================================== */
 
