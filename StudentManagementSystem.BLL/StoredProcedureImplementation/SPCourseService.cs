@@ -256,38 +256,68 @@ namespace StudentManagementSystem.BLL.StoredProcedureImplementation
         return courses;
     }
 
-    // 🔹 NEW: add prerequisite relationship
-    public void AddCoursePrerequisite(int courseId, int prerequisiteCourseId)
+public void AddCoursePrerequisite(int courseId, int prerequisiteCourseId)
+{
+    if (courseId == prerequisiteCourseId)
+        throw new InvalidOperationException("A course cannot be its own prerequisite.");
+
+    using (var conn = new SqlConnection(_connectionString))
     {
-        if (courseId == prerequisiteCourseId)
-            throw new InvalidOperationException("A course cannot be its own prerequisite.");
+        conn.Open();
 
-        using (var conn = new SqlConnection(_connectionString))
+        // 1) Check if this exact pair already exists
+        using (var checkCmd = new SqlCommand(@"
+            SELECT COUNT(1) 
+            FROM dbo.CoursePrerequisites 
+            WHERE CourseID = @CourseID 
+              AND PrerequisiteCourseID = @PrereqID;", conn))
         {
-            // Optional: check if exists
-            var checkCmd = new SqlCommand(@"
-                SELECT COUNT(1) 
-                FROM CoursePrerequisites 
-                WHERE CourseID = @CourseID AND PrerequisiteCourseID = @PrereqID", conn);
-
             checkCmd.Parameters.AddWithValue("@CourseID", courseId);
             checkCmd.Parameters.AddWithValue("@PrereqID", prerequisiteCourseId);
 
-            conn.Open();
             var exists = (int)checkCmd.ExecuteScalar() > 0;
+            if (exists)
+                return;
+        }
 
-            if (!exists)
-            {
-                var insertCmd = new SqlCommand(@"
-                    INSERT INTO CoursePrerequisites (CourseID, PrerequisiteCourseID)
-                    VALUES (@CourseID, @PrereqID)", conn);
+        // 2) Cycle detection: is courseId reachable from prerequisiteCourseId?
+        //    If YES, then adding (courseId -> prerequisiteCourseId) would create a cycle.
+        using (var cycleCmd = new SqlCommand(@"
+            ;WITH PrereqChain AS (
+                SELECT @PrereqID AS CourseID
+                UNION ALL
+                SELECT cp.PrerequisiteCourseID
+                FROM dbo.CoursePrerequisites cp
+                JOIN PrereqChain pc
+                  ON cp.CourseID = pc.CourseID
+            )
+            SELECT CASE WHEN EXISTS (
+                SELECT 1 FROM PrereqChain WHERE CourseID = @CourseID
+            ) THEN 1 ELSE 0 END
+            OPTION (MAXRECURSION 1000);", conn))
+        {
+            cycleCmd.Parameters.AddWithValue("@CourseID", courseId);
+            cycleCmd.Parameters.AddWithValue("@PrereqID", prerequisiteCourseId);
 
-                insertCmd.Parameters.AddWithValue("@CourseID", courseId);
-                insertCmd.Parameters.AddWithValue("@PrereqID", prerequisiteCourseId);
-                insertCmd.ExecuteNonQuery();
-            }
+            var wouldCycle = (int)cycleCmd.ExecuteScalar() == 1;
+            if (wouldCycle)
+                throw new InvalidOperationException(
+                    "This prerequisite would create a circular dependency between courses."
+                );
+        }
+
+        // 3) Insert safe prereq
+        using (var insertCmd = new SqlCommand(@"
+            INSERT INTO dbo.CoursePrerequisites (CourseID, PrerequisiteCourseID)
+            VALUES (@CourseID, @PrereqID);", conn))
+        {
+            insertCmd.Parameters.AddWithValue("@CourseID", courseId);
+            insertCmd.Parameters.AddWithValue("@PrereqID", prerequisiteCourseId);
+            insertCmd.ExecuteNonQuery();
         }
     }
+}
+
 
     // 🔹 NEW: remove prerequisite relationship
     public void RemoveCoursePrerequisite(int courseId, int prerequisiteCourseId)

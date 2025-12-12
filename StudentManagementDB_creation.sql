@@ -4,6 +4,9 @@
    - Creates tables, indexes, FKs, and extended properties
    =========================================================== */
 
+PRINT '=== RUNNING StudentManagementDB_creation.sql v2 (no ChangedByAdminID) ===';
+GO
+
 ---------------------------------------------------------------
 -- 0. Drop & Recreate Database
 ---------------------------------------------------------------
@@ -167,22 +170,22 @@ CREATE TABLE dbo.StudentHolds (
 GO
 
 CREATE TABLE dbo.Audit_GradeChanges (
-    AuditID          INT IDENTITY(1,1) NOT NULL,
-    EnrollmentID     INT NOT NULL,
-    EnrollmentDate   DATE NOT NULL,
-    OldGrade         NVARCHAR(2) NULL
+    AuditID        INT IDENTITY(1,1) NOT NULL,
+    EnrollmentID   INT NOT NULL,
+    EnrollmentDate DATE NOT NULL,
+    OldGrade       NVARCHAR(2) NULL
         CONSTRAINT CK_Audit_GradeChanges_OldGrade
         CHECK (OldGrade IN ('A', 'B', 'C', 'D', 'F') OR OldGrade IS NULL),
-    NewGrade         NVARCHAR(2) NULL
+    NewGrade       NVARCHAR(2) NULL
         CONSTRAINT CK_Audit_GradeChanges_NewGrade
         CHECK (NewGrade IN ('A', 'B', 'C', 'D', 'F') OR NewGrade IS NULL),
-    ChangedByAdminID INT NOT NULL,
-    ChangeDate       DATETIME2(0) NOT NULL
+    ChangeDate     DATETIME2(0) NOT NULL
         CONSTRAINT DF_Audit_GradeChanges_ChangeDate DEFAULT (SYSUTCDATETIME()),
     CONSTRAINT PK_Audit_GradeChanges
         PRIMARY KEY NONCLUSTERED (AuditID) ON [PRIMARY]
 ) ON PS_AuditByDate(EnrollmentDate);
 GO
+
 
 
 
@@ -318,14 +321,6 @@ EXEC sys.sp_addextendedproperty
     @level1type = N'Table',  @level1name = N'Audit_GradeChanges';
 GO
 
-EXEC sys.sp_addextendedproperty
-    @name = N'Column_Description',
-    @value = N'Refers to an Admin/Users table (not shown)',
-    @level0type = N'Schema',  @level0name = N'dbo',
-    @level1type = N'Table',   @level1name = N'Audit_GradeChanges',
-    @level2type = N'Column',  @level2name = N'ChangedByAdminID';
-GO
-
 ---------------------------------------------------------------
 -- 4. Foreign Keys
 ---------------------------------------------------------------
@@ -421,15 +416,6 @@ BEGIN
     ALTER TABLE dbo.StudentHolds
     ADD IsActive BIT NOT NULL
         CONSTRAINT DF_StudentHolds_IsActive DEFAULT (1);
-END;
-GO
-
--- Optional: store login name in audit table in addition to AdminID
-IF COL_LENGTH('dbo.Audit_GradeChanges', 'ChangedByLogin') IS NULL
-BEGIN
-    ALTER TABLE dbo.Audit_GradeChanges
-    ADD ChangedByLogin NVARCHAR(256) NOT NULL
-        CONSTRAINT DF_Audit_GradeChanges_ChangedByLogin DEFAULT (SYSTEM_USER);
 END;
 GO
 
@@ -822,20 +808,20 @@ BEGIN
         RETURN;
 
     INSERT INTO dbo.Audit_GradeChanges
-        (EnrollmentID, EnrollmentDate, OldGrade, NewGrade, ChangedByLogin)
+        (EnrollmentID, EnrollmentDate, OldGrade, NewGrade)
     SELECT
         i.EnrollmentID,
         i.EnrollmentDate,
         d.Grade AS OldGrade,
-        i.Grade AS NewGrade,
-        SYSTEM_USER
+        i.Grade AS NewGrade
     FROM inserted AS i
     JOIN deleted  AS d
         ON i.EnrollmentID   = d.EnrollmentID
        AND i.EnrollmentDate = d.EnrollmentDate
-    WHERE ISNULL(d.Grade,'') <> ISNULL(i.Grade,'');  -- ignore no-op updates
+    WHERE ISNULL(d.Grade, '') <> ISNULL(i.Grade, '');  -- ignore no-op updates
 END;
 GO
+
 
 -------------------------------
 -- 4.2 trg_InsteadOf_DeleteStudent on Students
@@ -1153,7 +1139,7 @@ IF NOT EXISTS (SELECT 1 FROM dbo.Audit_GradeChanges)
 BEGIN
     -- Take a subset of enrollments that have a non-NULL grade
     INSERT INTO dbo.Audit_GradeChanges
-        (EnrollmentID, EnrollmentDate, OldGrade, NewGrade, ChangedByAdminID)
+        (EnrollmentID, EnrollmentDate, OldGrade, NewGrade)
     SELECT TOP (20000)
         e.EnrollmentID,
         e.EnrollmentDate,
@@ -1165,13 +1151,13 @@ BEGIN
             WHEN 'F' THEN 'F'
             ELSE NULL
         END AS OldGrade,
-        e.Grade AS NewGrade,
-        1       AS ChangedByAdminID
+        e.Grade AS NewGrade
     FROM dbo.Enrollments AS e
     WHERE e.Grade IS NOT NULL
     ORDER BY e.EnrollmentID;
 END;
 GO
+
 
 ---------------------------------------------------------------
 -- 10. Summary (fixed)

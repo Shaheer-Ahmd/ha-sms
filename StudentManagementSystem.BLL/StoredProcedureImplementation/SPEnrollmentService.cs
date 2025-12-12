@@ -306,5 +306,45 @@ namespace StudentManagementSystem.BLL.StoredProcedureImplementation
                 cmd.ExecuteNonQuery();
             }
         }
+public List<AuditGradeChange> GetGradeAuditLog()
+{
+    var result = new List<AuditGradeChange>();
+
+    using (var conn = new SqlConnection(_connectionString))
+    using (var cmd = conn.CreateCommand())
+    {
+        cmd.CommandText = @"
+            SELECT TOP 1000
+                a.AuditID,
+                a.EnrollmentID,
+                a.EnrollmentDate,
+                a.OldGrade,
+                a.NewGrade,
+                a.ChangeDate
+            FROM dbo.Audit_GradeChanges AS a
+            ORDER BY a.ChangeDate DESC;";
+
+        conn.Open();
+        using (var reader = cmd.ExecuteReader())
+        {
+            while (reader.Read())
+            {
+                var audit = new AuditGradeChange
+                {
+                    AuditID        = (int)reader["AuditID"],
+                    EnrollmentID   = (int)reader["EnrollmentID"],
+                    EnrollmentDate = (DateTime)reader["EnrollmentDate"],
+                    OldGrade       = reader["OldGrade"] as string,
+                    NewGrade       = reader["NewGrade"] as string,
+                    ChangeDate     = (DateTime)reader["ChangeDate"]
+                };
+
+                result.Add(audit);
+            }
+        }
+    }
+
+    return result;
+}
     }
 }

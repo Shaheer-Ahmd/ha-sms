@@ -101,6 +101,9 @@ namespace StudentManagementSystem.DAL
                 .HasForeignKey(e => e.OfferingID)
                 .OnDelete(DeleteBehavior.Restrict);
 
+            modelBuilder.Entity<Enrollment>()
+            .ToTable(tb => tb.UseSqlOutputClause(false));
+
             // StudentHold
             modelBuilder.Entity<StudentHold>()
                 .HasOne(sh => sh.Student)
@@ -109,9 +112,11 @@ namespace StudentManagementSystem.DAL
                 .OnDelete(DeleteBehavior.Restrict);
 
             // AuditGradeChange - Composite Key
+            // modelBuilder.Entity<AuditGradeChange>()
+            //     .HasKey(ag => new { ag.AuditID, ag.ChangeDate });
             modelBuilder.Entity<AuditGradeChange>()
-                .HasKey(ag => new { ag.AuditID, ag.ChangeDate });
-
+            .ToTable("Audit_GradeChanges")
+            .HasKey(a => a.AuditID);
             // StudentTranscript is a view - configure as view
             modelBuilder.Entity<StudentTranscript>()
                 .ToView("StudentTranscript")

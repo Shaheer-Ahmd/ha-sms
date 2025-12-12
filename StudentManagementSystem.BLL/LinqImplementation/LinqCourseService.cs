@@ -151,28 +151,73 @@ namespace StudentManagementSystem.BLL.LinqImplementation
             }
         }
 
-        public void AddCoursePrerequisite(int courseId, int prerequisiteCourseId)
+public void AddCoursePrerequisite(int courseId, int prerequisiteCourseId)
+{
+    using (var context = new StudentManagementContext(_connectionString))
+    {
+        if (courseId == prerequisiteCourseId)
+            throw new InvalidOperationException("A course cannot be its own prerequisite.");
+
+        // Already exists? nothing to do
+        var exists = context.CoursePrerequisites.Any(cp =>
+            cp.CourseID == courseId &&
+            cp.PrerequisiteCourseID == prerequisiteCourseId);
+
+        if (exists)
+            return;
+
+        // --- Cycle check: does a path exist from prerequisiteCourseId -> courseId? ---
+        // Load all existing edges once
+        var allEdges = context.CoursePrerequisites
+            .Select(cp => new { cp.CourseID, cp.PrerequisiteCourseID })
+            .ToList();
+
+        // Build lookup: for each course, which courses does it require?
+        var lookup = allEdges
+            .GroupBy(e => e.CourseID)
+            .ToDictionary(
+                g => g.Key,
+                g => g.Select(e => e.PrerequisiteCourseID).ToList()
+            );
+
+        var toVisit = new Stack<int>();
+        var visited = new HashSet<int>();
+
+        toVisit.Push(prerequisiteCourseId);
+
+        while (toVisit.Count > 0)
         {
-            using (var context = new StudentManagementContext(_connectionString))
+            var current = toVisit.Pop();
+            if (!visited.Add(current))
+                continue;
+
+            // If we can reach courseId from prerequisiteCourseId -> cycle
+            if (current == courseId)
+                throw new InvalidOperationException(
+                    "This prerequisite would create a circular dependency between courses."
+                );
+
+            if (lookup.TryGetValue(current, out var nexts))
             {
-                if (courseId == prerequisiteCourseId)
-                    throw new InvalidOperationException("A course cannot be its own prerequisite.");
-
-                var exists = context.CoursePrerequisites.Any(cp =>
-                    cp.CourseID == courseId && cp.PrerequisiteCourseID == prerequisiteCourseId);
-
-                if (!exists)
+                foreach (var next in nexts)
                 {
-                    var entity = new CoursePrerequisite
-                    {
-                        CourseID = courseId,
-                        PrerequisiteCourseID = prerequisiteCourseId
-                    };
-                    context.CoursePrerequisites.Add(entity);
-                    context.SaveChanges();
+                    if (!visited.Contains(next))
+                        toVisit.Push(next);
                 }
             }
         }
+
+        // --- Safe to insert ---
+        var entity = new CoursePrerequisite
+        {
+            CourseID = courseId,
+            PrerequisiteCourseID = prerequisiteCourseId
+        };
+
+        context.CoursePrerequisites.Add(entity);
+        context.SaveChanges();
+    }
+}
 
         public void RemoveCoursePrerequisite(int courseId, int prerequisiteCourseId)
         {

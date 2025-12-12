@@ -84,5 +84,12 @@ namespace StudentManagementSystem.UI.Forms
         {
             Application.Exit();
         }
+        private void btnViewGradeAudit_Click(object sender, EventArgs e)
+        {
+            using (var form = new GradeAuditForm(_bllFactory))
+            {
+                form.ShowDialog(this);
+            }
+        }
     }
 }

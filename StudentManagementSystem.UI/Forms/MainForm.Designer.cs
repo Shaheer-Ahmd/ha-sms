@@ -12,6 +12,8 @@ namespace StudentManagementSystem.UI.Forms
         private System.Windows.Forms.Label lblTitle;
         private System.Windows.Forms.Label lblBLLStatus;
         private System.Windows.Forms.Panel panel1;
+        private System.Windows.Forms.Button btnViewGradeAudit;
+
 
         protected override void Dispose(bool disposing)
         {
@@ -136,6 +138,19 @@ namespace StudentManagementSystem.UI.Forms
             this.btnExit.UseVisualStyleBackColor = true;
             this.btnExit.Click += new System.EventHandler(this.btnExit_Click);
             // 
+// btnViewGradeAudit
+// 
+this.btnViewGradeAudit = new System.Windows.Forms.Button();
+this.btnViewGradeAudit.BackColor = System.Drawing.Color.MistyRose;
+this.btnViewGradeAudit.Location = new System.Drawing.Point(150, 260); // adjust as desired
+this.btnViewGradeAudit.Name = "btnViewGradeAudit";
+this.btnViewGradeAudit.Size = new System.Drawing.Size(300, 40);
+this.btnViewGradeAudit.TabIndex = 5;
+this.btnViewGradeAudit.Text = "View Grade Audit Log";
+this.btnViewGradeAudit.UseVisualStyleBackColor = false;
+this.btnViewGradeAudit.Click += new System.EventHandler(this.btnViewGradeAudit_Click);
+
+            // 
             // MainForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
@@ -146,6 +161,8 @@ namespace StudentManagementSystem.UI.Forms
             this.Controls.Add(this.btnSwitchBLL);
             this.Controls.Add(this.panel1);
             this.Controls.Add(this.lblTitle);
+            this.Controls.Add(this.btnViewGradeAudit);
+
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedSingle;
             this.MaximizeBox = false;
             this.Name = "MainForm";

@@ -21,5 +21,7 @@ namespace StudentManagementSystem.BLL.Interfaces
         void AddCourseOffering(CourseOffering offering);
         void UpdateCourseOffering(CourseOffering offering);
         void DeleteCourseOffering(int offeringId);
+        List<AuditGradeChange> GetGradeAuditLog();
+
     }
 }
