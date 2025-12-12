@@ -19,7 +19,7 @@ namespace StudentManagementSystem.BLL.StoredProcedureImplementation
         public List<CourseOffering> GetAllOfferings()
         {
             var offerings = new List<CourseOffering>();
-            
+
             using (var connection = new SqlConnection(_connectionString))
             {
                 connection.Open();
@@ -61,14 +61,14 @@ namespace StudentManagementSystem.BLL.StoredProcedureImplementation
                     }
                 }
             }
-            
+
             return offerings;
         }
 
         public List<CourseOffering> GetOfferingsBySemester(int semesterId)
         {
             var offerings = new List<CourseOffering>();
-            
+
             using (var connection = new SqlConnection(_connectionString))
             {
                 connection.Open();
@@ -81,7 +81,7 @@ namespace StudentManagementSystem.BLL.StoredProcedureImplementation
                     WHERE co.SemesterID = @SemesterID", connection))
                 {
                     command.Parameters.AddWithValue("@SemesterID", semesterId);
-                    
+
                     using (var reader = command.ExecuteReader())
                     {
                         while (reader.Read())
@@ -104,14 +104,14 @@ namespace StudentManagementSystem.BLL.StoredProcedureImplementation
                     }
                 }
             }
-            
+
             return offerings;
         }
 
         public List<CourseOffering> GetOfferingsByCourse(int courseId)
         {
             var offerings = new List<CourseOffering>();
-            
+
             using (var connection = new SqlConnection(_connectionString))
             {
                 connection.Open();
@@ -124,7 +124,7 @@ namespace StudentManagementSystem.BLL.StoredProcedureImplementation
                     WHERE co.CourseID = @CourseID", connection))
                 {
                     command.Parameters.AddWithValue("@CourseID", courseId);
-                    
+
                     using (var reader = command.ExecuteReader())
                     {
                         while (reader.Read())
@@ -147,14 +147,14 @@ namespace StudentManagementSystem.BLL.StoredProcedureImplementation
                     }
                 }
             }
-            
+
             return offerings;
         }
 
         public List<CourseOffering> GetAvailableOfferings()
         {
             var offerings = new List<CourseOffering>();
-            
+
             using (var connection = new SqlConnection(_connectionString))
             {
                 connection.Open();
@@ -180,7 +180,7 @@ namespace StudentManagementSystem.BLL.StoredProcedureImplementation
                     }
                 }
             }
-            
+
             return offerings;
         }
 
@@ -195,7 +195,7 @@ namespace StudentManagementSystem.BLL.StoredProcedureImplementation
                     WHERE OfferingID = @OfferingID", connection))
                 {
                     command.Parameters.AddWithValue("@OfferingID", offeringId);
-                    
+
                     using (var reader = command.ExecuteReader())
                     {
                         if (reader.Read())
@@ -212,7 +212,7 @@ namespace StudentManagementSystem.BLL.StoredProcedureImplementation
                     }
                 }
             }
-            
+
             return null;
         }
 
@@ -229,7 +229,7 @@ namespace StudentManagementSystem.BLL.StoredProcedureImplementation
                     command.Parameters.AddWithValue("@SemesterID", offering.SemesterID);
                     command.Parameters.AddWithValue("@MaxCapacity", offering.MaxCapacity);
                     command.Parameters.AddWithValue("@CurrentEnrollment", offering.CurrentEnrollment);
-                    
+
                     command.ExecuteNonQuery();
                 }
             }
@@ -253,7 +253,7 @@ namespace StudentManagementSystem.BLL.StoredProcedureImplementation
                     command.Parameters.AddWithValue("@SemesterID", offering.SemesterID);
                     command.Parameters.AddWithValue("@MaxCapacity", offering.MaxCapacity);
                     command.Parameters.AddWithValue("@CurrentEnrollment", offering.CurrentEnrollment);
-                    
+
                     command.ExecuteNonQuery();
                 }
             }

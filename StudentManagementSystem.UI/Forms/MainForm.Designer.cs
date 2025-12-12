@@ -13,6 +13,7 @@ namespace StudentManagementSystem.UI.Forms
         private System.Windows.Forms.Label lblBLLStatus;
         private System.Windows.Forms.Panel panel1;
         private System.Windows.Forms.Button btnViewGradeAudit;
+        private System.Windows.Forms.Button btnCourseOfferings;
 
 
         protected override void Dispose(bool disposing)
@@ -150,6 +151,20 @@ this.btnViewGradeAudit.Text = "View Grade Audit Log";
 this.btnViewGradeAudit.UseVisualStyleBackColor = false;
 this.btnViewGradeAudit.Click += new System.EventHandler(this.btnViewGradeAudit_Click);
 
+this.btnCourseOfferings = new System.Windows.Forms.Button();
+// 
+// btnCourseOfferings
+// 
+this.btnCourseOfferings.Font = new System.Drawing.Font("Microsoft Sans Serif", 11F);
+this.btnCourseOfferings.Location = new System.Drawing.Point(135, 140); // center-ish in panel
+this.btnCourseOfferings.Name = "btnCourseOfferings";
+this.btnCourseOfferings.Size = new System.Drawing.Size(200, 60);
+this.btnCourseOfferings.TabIndex = 4;
+this.btnCourseOfferings.Text = "Manage Course Offerings";
+this.btnCourseOfferings.UseVisualStyleBackColor = true;
+this.btnCourseOfferings.Click += new System.EventHandler(this.btnCourseOfferings_Click);
+
+
             // 
             // MainForm
             // 
@@ -162,6 +177,12 @@ this.btnViewGradeAudit.Click += new System.EventHandler(this.btnViewGradeAudit_C
             this.Controls.Add(this.panel1);
             this.Controls.Add(this.lblTitle);
             this.Controls.Add(this.btnViewGradeAudit);
+            this.panel1.Controls.Add(this.btnStudents);
+this.panel1.Controls.Add(this.btnCourses);
+this.panel1.Controls.Add(this.btnEnrollments);
+this.panel1.Controls.Add(this.btnDepartments);
+this.panel1.Controls.Add(this.btnCourseOfferings);
+
 
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedSingle;
             this.MaximizeBox = false;

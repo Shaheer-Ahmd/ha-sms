@@ -10,7 +10,7 @@ namespace StudentManagementSystem.DAL
 
         public StudentManagementContext() { }
 
-        public StudentManagementContext(DbContextOptions<StudentManagementContext> options) 
+        public StudentManagementContext(DbContextOptions<StudentManagementContext> options)
             : base(options)
         {
         }

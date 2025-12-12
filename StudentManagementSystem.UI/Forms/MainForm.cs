@@ -23,17 +23,17 @@ namespace StudentManagementSystem.UI.Forms
         {
             var builder = new ConfigurationBuilder()
                 .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
-            
+
             _configuration = builder.Build();
         }
 
         private void InitializeBLL()
         {
             string bllType = _configuration["AppSettings:BLLImplementation"] ?? "LINQ";
-            _currentImplementation = bllType == "StoredProcedure" 
-                ? BLLImplementationType.StoredProcedure 
+            _currentImplementation = bllType == "StoredProcedure"
+                ? BLLImplementationType.StoredProcedure
                 : BLLImplementationType.LINQ;
-            
+
             _bllFactory = new BusinessLogicFactory(_currentImplementation);
             UpdateStatusLabel();
         }
@@ -52,7 +52,7 @@ namespace StudentManagementSystem.UI.Forms
             _bllFactory = new BusinessLogicFactory(_currentImplementation);
             UpdateStatusLabel();
 
-            MessageBox.Show($"Switched to {_currentImplementation} implementation!", 
+            MessageBox.Show($"Switched to {_currentImplementation} implementation!",
                 "BLL Switcher", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
@@ -91,5 +91,14 @@ namespace StudentManagementSystem.UI.Forms
                 form.ShowDialog(this);
             }
         }
+        private void btnCourseOfferings_Click(object sender, EventArgs e)
+        {
+            using (var form = new CourseOfferingForm(_bllFactory))
+            {
+                form.ShowDialog(this);
+            }
+        }
+
+
     }
 }

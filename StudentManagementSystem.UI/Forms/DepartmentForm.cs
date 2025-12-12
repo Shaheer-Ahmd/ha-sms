@@ -26,14 +26,14 @@ namespace StudentManagementSystem.UI.Forms
             try
             {
                 var departments = _departmentService.GetAllDepartments();
-                
+
                 // Display all departments in grid
                 var departmentList = departments.Select(d => new
                 {
                     d.DepartmentID,
                     d.DepartmentName,
-                    ParentDepartment = d.ParentDepartmentID.HasValue 
-                        ? departments.FirstOrDefault(p => p.DepartmentID == d.ParentDepartmentID.Value)?.DepartmentName 
+                    ParentDepartment = d.ParentDepartmentID.HasValue
+                        ? departments.FirstOrDefault(p => p.DepartmentID == d.ParentDepartmentID.Value)?.DepartmentName
                         : "(Root)",
                     Status = d.IsActive ? "Active" : "Inactive"
                 }).OrderBy(d => d.DepartmentID).ToList();
@@ -42,7 +42,7 @@ namespace StudentManagementSystem.UI.Forms
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error loading departments: {ex.Message}", "Error", 
+                MessageBox.Show($"Error loading departments: {ex.Message}", "Error",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
@@ -53,11 +53,11 @@ namespace StudentManagementSystem.UI.Forms
             {
                 // Call sp_GetDepartmentHierarchy to show recursive CTE results
                 var hierarchy = _departmentService.GetDepartmentHierarchy();
-                
+
                 if (hierarchy != null && hierarchy.Rows.Count > 0)
                 {
                     dgvHierarchy.DataSource = hierarchy;
-                    
+
                     // Adjust column widths
                     if (dgvHierarchy.Columns.Contains("IndentedName"))
                     {
@@ -67,20 +67,20 @@ namespace StudentManagementSystem.UI.Forms
                     {
                         dgvHierarchy.Columns["HierarchyPath"].Width = 400;
                     }
-                    
+
                     tabControl.SelectedTab = tabHierarchy;
-                    MessageBox.Show($"Hierarchy loaded successfully! Showing {hierarchy.Rows.Count} departments.", 
+                    MessageBox.Show($"Hierarchy loaded successfully! Showing {hierarchy.Rows.Count} departments.",
                         "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
                 else
                 {
-                    MessageBox.Show("No hierarchy data returned.", "Info", 
+                    MessageBox.Show("No hierarchy data returned.", "Info",
                         MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error loading hierarchy: {ex.Message}", "Error", 
+                MessageBox.Show($"Error loading hierarchy: {ex.Message}", "Error",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
@@ -91,7 +91,7 @@ namespace StudentManagementSystem.UI.Forms
             {
                 if (string.IsNullOrWhiteSpace(txtDepartmentName.Text))
                 {
-                    MessageBox.Show("Please enter a department name.", "Validation", 
+                    MessageBox.Show("Please enter a department name.", "Validation",
                         MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
@@ -99,23 +99,23 @@ namespace StudentManagementSystem.UI.Forms
                 var department = new Department
                 {
                     DepartmentName = txtDepartmentName.Text.Trim(),
-                    ParentDepartmentID = cmbParentDepartment.SelectedValue != null 
-                        ? (int?)cmbParentDepartment.SelectedValue 
+                    ParentDepartmentID = cmbParentDepartment.SelectedValue != null
+                        ? (int?)cmbParentDepartment.SelectedValue
                         : null,
                     IsActive = chkIsActive.Checked
                 };
 
                 _departmentService.AddDepartment(department);
-                MessageBox.Show("Department added successfully!", "Success", 
+                MessageBox.Show("Department added successfully!", "Success",
                     MessageBoxButtons.OK, MessageBoxIcon.Information);
-                
+
                 ClearForm();
                 LoadDepartments();
                 LoadParentDepartments();
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error adding department: {ex.Message}", "Error", 
+                MessageBox.Show($"Error adding department: {ex.Message}", "Error",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
@@ -126,14 +126,14 @@ namespace StudentManagementSystem.UI.Forms
             {
                 if (dgvDepartments.SelectedRows.Count == 0)
                 {
-                    MessageBox.Show("Please select a department to update.", "Validation", 
+                    MessageBox.Show("Please select a department to update.", "Validation",
                         MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
 
                 if (string.IsNullOrWhiteSpace(txtDepartmentName.Text))
                 {
-                    MessageBox.Show("Please enter a department name.", "Validation", 
+                    MessageBox.Show("Please enter a department name.", "Validation",
                         MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
@@ -144,15 +144,15 @@ namespace StudentManagementSystem.UI.Forms
                 if (department != null)
                 {
                     department.DepartmentName = txtDepartmentName.Text.Trim();
-                    department.ParentDepartmentID = cmbParentDepartment.SelectedValue != null 
-                        ? (int?)cmbParentDepartment.SelectedValue 
+                    department.ParentDepartmentID = cmbParentDepartment.SelectedValue != null
+                        ? (int?)cmbParentDepartment.SelectedValue
                         : null;
                     department.IsActive = chkIsActive.Checked;
 
                     _departmentService.UpdateDepartment(department);
-                    MessageBox.Show("Department updated successfully!", "Success", 
+                    MessageBox.Show("Department updated successfully!", "Success",
                         MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    
+
                     ClearForm();
                     LoadDepartments();
                     LoadParentDepartments();
@@ -160,7 +160,7 @@ namespace StudentManagementSystem.UI.Forms
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error updating department: {ex.Message}", "Error", 
+                MessageBox.Show($"Error updating department: {ex.Message}", "Error",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
@@ -171,22 +171,22 @@ namespace StudentManagementSystem.UI.Forms
             {
                 if (dgvDepartments.SelectedRows.Count == 0)
                 {
-                    MessageBox.Show("Please select a department to delete.", "Validation", 
+                    MessageBox.Show("Please select a department to delete.", "Validation",
                         MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
 
                 int departmentId = Convert.ToInt32(dgvDepartments.SelectedRows[0].Cells["DepartmentID"].Value);
-                
-                var result = MessageBox.Show("Are you sure you want to delete this department?", 
+
+                var result = MessageBox.Show("Are you sure you want to delete this department?",
                     "Confirm Delete", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
 
                 if (result == DialogResult.Yes)
                 {
                     _departmentService.DeleteDepartment(departmentId);
-                    MessageBox.Show("Department deleted successfully!", "Success", 
+                    MessageBox.Show("Department deleted successfully!", "Success",
                         MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    
+
                     ClearForm();
                     LoadDepartments();
                     LoadParentDepartments();
@@ -194,7 +194,7 @@ namespace StudentManagementSystem.UI.Forms
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error deleting department: {ex.Message}\n\nNote: Cannot delete departments with sub-departments or courses.", 
+                MessageBox.Show($"Error deleting department: {ex.Message}\n\nNote: Cannot delete departments with sub-departments or courses.",
                     "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
@@ -224,7 +224,7 @@ namespace StudentManagementSystem.UI.Forms
             try
             {
                 var departments = _departmentService.GetAllDepartments().ToList();
-                
+
                 // Add "(None)" option for root departments
                 var parentList = departments.Select(d => new
                 {
@@ -241,7 +241,7 @@ namespace StudentManagementSystem.UI.Forms
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error loading parent departments: {ex.Message}", "Error", 
+                MessageBox.Show($"Error loading parent departments: {ex.Message}", "Error",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }

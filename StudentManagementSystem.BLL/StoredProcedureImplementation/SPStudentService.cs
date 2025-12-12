@@ -77,13 +77,13 @@ namespace StudentManagementSystem.BLL.StoredProcedureImplementation
                 var cmd = new SqlCommand(@"
                     INSERT INTO Students (FirstName, LastName, Email, EnrollmentStatus, DateOfBirth)
                     VALUES (@FirstName, @LastName, @Email, @EnrollmentStatus, @DateOfBirth)", conn);
-                
+
                 cmd.Parameters.AddWithValue("@FirstName", student.FirstName);
                 cmd.Parameters.AddWithValue("@LastName", student.LastName);
                 cmd.Parameters.AddWithValue("@Email", student.Email);
                 cmd.Parameters.AddWithValue("@EnrollmentStatus", student.EnrollmentStatus);
                 cmd.Parameters.AddWithValue("@DateOfBirth", (object)student.DateOfBirth ?? DBNull.Value);
-                
+
                 conn.Open();
                 cmd.ExecuteNonQuery();
             }
@@ -99,14 +99,14 @@ namespace StudentManagementSystem.BLL.StoredProcedureImplementation
                         Email = @Email, EnrollmentStatus = @EnrollmentStatus, 
                         DateOfBirth = @DateOfBirth
                     WHERE StudentID = @StudentID", conn);
-                
+
                 cmd.Parameters.AddWithValue("@StudentID", student.StudentID);
                 cmd.Parameters.AddWithValue("@FirstName", student.FirstName);
                 cmd.Parameters.AddWithValue("@LastName", student.LastName);
                 cmd.Parameters.AddWithValue("@Email", student.Email);
                 cmd.Parameters.AddWithValue("@EnrollmentStatus", student.EnrollmentStatus);
                 cmd.Parameters.AddWithValue("@DateOfBirth", (object)student.DateOfBirth ?? DBNull.Value);
-                
+
                 conn.Open();
                 cmd.ExecuteNonQuery();
             }

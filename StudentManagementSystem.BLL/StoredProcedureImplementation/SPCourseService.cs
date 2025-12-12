@@ -88,13 +88,13 @@ namespace StudentManagementSystem.BLL.StoredProcedureImplementation
                 var cmd = new SqlCommand(@"
                     INSERT INTO Courses (CourseCode, Title, Description, Credits, DepartmentID)
                     VALUES (@CourseCode, @Title, @Description, @Credits, @DepartmentID)", conn);
-                
+
                 cmd.Parameters.AddWithValue("@CourseCode", course.CourseCode);
                 cmd.Parameters.AddWithValue("@Title", course.Title);
                 cmd.Parameters.AddWithValue("@Description", (object)course.Description ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@Credits", course.Credits);
                 cmd.Parameters.AddWithValue("@DepartmentID", course.DepartmentID);
-                
+
                 conn.Open();
                 cmd.ExecuteNonQuery();
             }
@@ -109,14 +109,14 @@ namespace StudentManagementSystem.BLL.StoredProcedureImplementation
                     SET CourseCode = @CourseCode, Title = @Title, Description = @Description, 
                         Credits = @Credits, DepartmentID = @DepartmentID
                     WHERE CourseID = @CourseID", conn);
-                
+
                 cmd.Parameters.AddWithValue("@CourseID", course.CourseID);
                 cmd.Parameters.AddWithValue("@CourseCode", course.CourseCode);
                 cmd.Parameters.AddWithValue("@Title", course.Title);
                 cmd.Parameters.AddWithValue("@Description", (object)course.Description ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@Credits", course.Credits);
                 cmd.Parameters.AddWithValue("@DepartmentID", course.DepartmentID);
-                
+
                 conn.Open();
                 cmd.ExecuteNonQuery();
             }
@@ -224,13 +224,13 @@ namespace StudentManagementSystem.BLL.StoredProcedureImplementation
             }
         }
 
-         public List<Course> GetAvailablePrerequisiteCourses(int courseId)
-    {
-        var courses = new List<Course>();
-
-        using (var conn = new SqlConnection(_connectionString))
+        public List<Course> GetAvailablePrerequisiteCourses(int courseId)
         {
-            var cmd = new SqlCommand(@"
+            var courses = new List<Course>();
+
+            using (var conn = new SqlConnection(_connectionString))
+            {
+                var cmd = new SqlCommand(@"
                 SELECT c.CourseID, c.CourseCode, c.Title, c.Description, c.Credits, c.DepartmentID, d.DepartmentName
                 FROM Courses c
                 INNER JOIN Departments d ON c.DepartmentID = d.DepartmentID
@@ -241,48 +241,48 @@ namespace StudentManagementSystem.BLL.StoredProcedureImplementation
                       WHERE CourseID = @CourseID
                   )", conn);
 
-            cmd.Parameters.AddWithValue("@CourseID", courseId);
-            conn.Open();
+                cmd.Parameters.AddWithValue("@CourseID", courseId);
+                conn.Open();
 
-            using (var reader = cmd.ExecuteReader())
-            {
-                while (reader.Read())
+                using (var reader = cmd.ExecuteReader())
                 {
-                    courses.Add(MapCourse(reader));
+                    while (reader.Read())
+                    {
+                        courses.Add(MapCourse(reader));
+                    }
                 }
             }
+
+            return courses;
         }
 
-        return courses;
-    }
+        public void AddCoursePrerequisite(int courseId, int prerequisiteCourseId)
+        {
+            if (courseId == prerequisiteCourseId)
+                throw new InvalidOperationException("A course cannot be its own prerequisite.");
 
-public void AddCoursePrerequisite(int courseId, int prerequisiteCourseId)
-{
-    if (courseId == prerequisiteCourseId)
-        throw new InvalidOperationException("A course cannot be its own prerequisite.");
+            using (var conn = new SqlConnection(_connectionString))
+            {
+                conn.Open();
 
-    using (var conn = new SqlConnection(_connectionString))
-    {
-        conn.Open();
-
-        // 1) Check if this exact pair already exists
-        using (var checkCmd = new SqlCommand(@"
+                // 1) Check if this exact pair already exists
+                using (var checkCmd = new SqlCommand(@"
             SELECT COUNT(1) 
             FROM dbo.CoursePrerequisites 
             WHERE CourseID = @CourseID 
               AND PrerequisiteCourseID = @PrereqID;", conn))
-        {
-            checkCmd.Parameters.AddWithValue("@CourseID", courseId);
-            checkCmd.Parameters.AddWithValue("@PrereqID", prerequisiteCourseId);
+                {
+                    checkCmd.Parameters.AddWithValue("@CourseID", courseId);
+                    checkCmd.Parameters.AddWithValue("@PrereqID", prerequisiteCourseId);
 
-            var exists = (int)checkCmd.ExecuteScalar() > 0;
-            if (exists)
-                return;
-        }
+                    var exists = (int)checkCmd.ExecuteScalar() > 0;
+                    if (exists)
+                        return;
+                }
 
-        // 2) Cycle detection: is courseId reachable from prerequisiteCourseId?
-        //    If YES, then adding (courseId -> prerequisiteCourseId) would create a cycle.
-        using (var cycleCmd = new SqlCommand(@"
+                // 2) Cycle detection: is courseId reachable from prerequisiteCourseId?
+                //    If YES, then adding (courseId -> prerequisiteCourseId) would create a cycle.
+                using (var cycleCmd = new SqlCommand(@"
             ;WITH PrereqChain AS (
                 SELECT @PrereqID AS CourseID
                 UNION ALL
@@ -295,46 +295,46 @@ public void AddCoursePrerequisite(int courseId, int prerequisiteCourseId)
                 SELECT 1 FROM PrereqChain WHERE CourseID = @CourseID
             ) THEN 1 ELSE 0 END
             OPTION (MAXRECURSION 1000);", conn))
-        {
-            cycleCmd.Parameters.AddWithValue("@CourseID", courseId);
-            cycleCmd.Parameters.AddWithValue("@PrereqID", prerequisiteCourseId);
+                {
+                    cycleCmd.Parameters.AddWithValue("@CourseID", courseId);
+                    cycleCmd.Parameters.AddWithValue("@PrereqID", prerequisiteCourseId);
 
-            var wouldCycle = (int)cycleCmd.ExecuteScalar() == 1;
-            if (wouldCycle)
-                throw new InvalidOperationException(
-                    "This prerequisite would create a circular dependency between courses."
-                );
-        }
+                    var wouldCycle = (int)cycleCmd.ExecuteScalar() == 1;
+                    if (wouldCycle)
+                        throw new InvalidOperationException(
+                            "This prerequisite would create a circular dependency between courses."
+                        );
+                }
 
-        // 3) Insert safe prereq
-        using (var insertCmd = new SqlCommand(@"
+                // 3) Insert safe prereq
+                using (var insertCmd = new SqlCommand(@"
             INSERT INTO dbo.CoursePrerequisites (CourseID, PrerequisiteCourseID)
             VALUES (@CourseID, @PrereqID);", conn))
-        {
-            insertCmd.Parameters.AddWithValue("@CourseID", courseId);
-            insertCmd.Parameters.AddWithValue("@PrereqID", prerequisiteCourseId);
-            insertCmd.ExecuteNonQuery();
+                {
+                    insertCmd.Parameters.AddWithValue("@CourseID", courseId);
+                    insertCmd.Parameters.AddWithValue("@PrereqID", prerequisiteCourseId);
+                    insertCmd.ExecuteNonQuery();
+                }
+            }
         }
-    }
-}
 
 
-    // 🔹 NEW: remove prerequisite relationship
-    public void RemoveCoursePrerequisite(int courseId, int prerequisiteCourseId)
-    {
-        using (var conn = new SqlConnection(_connectionString))
+        // 🔹 NEW: remove prerequisite relationship
+        public void RemoveCoursePrerequisite(int courseId, int prerequisiteCourseId)
         {
-            var cmd = new SqlCommand(@"
+            using (var conn = new SqlConnection(_connectionString))
+            {
+                var cmd = new SqlCommand(@"
                 DELETE FROM CoursePrerequisites
                 WHERE CourseID = @CourseID AND PrerequisiteCourseID = @PrereqID", conn);
 
-            cmd.Parameters.AddWithValue("@CourseID", courseId);
-            cmd.Parameters.AddWithValue("@PrereqID", prerequisiteCourseId);
+                cmd.Parameters.AddWithValue("@CourseID", courseId);
+                cmd.Parameters.AddWithValue("@PrereqID", prerequisiteCourseId);
 
-            conn.Open();
-            cmd.ExecuteNonQuery();
+                conn.Open();
+                cmd.ExecuteNonQuery();
+            }
         }
-    }
 
         private Course MapCourse(IDataReader reader)
         {

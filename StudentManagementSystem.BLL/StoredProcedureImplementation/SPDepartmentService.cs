@@ -71,11 +71,11 @@ namespace StudentManagementSystem.BLL.StoredProcedureImplementation
                 var cmd = new SqlCommand(@"
                     INSERT INTO Departments (DepartmentName, ParentDepartmentID, IsActive)
                     VALUES (@DepartmentName, @ParentDepartmentID, @IsActive)", conn);
-                
+
                 cmd.Parameters.AddWithValue("@DepartmentName", department.DepartmentName);
                 cmd.Parameters.AddWithValue("@ParentDepartmentID", (object)department.ParentDepartmentID ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@IsActive", department.IsActive);
-                
+
                 conn.Open();
                 cmd.ExecuteNonQuery();
             }
@@ -89,12 +89,12 @@ namespace StudentManagementSystem.BLL.StoredProcedureImplementation
                     UPDATE Departments 
                     SET DepartmentName = @DepartmentName, ParentDepartmentID = @ParentDepartmentID, IsActive = @IsActive
                     WHERE DepartmentID = @DepartmentID", conn);
-                
+
                 cmd.Parameters.AddWithValue("@DepartmentID", department.DepartmentID);
                 cmd.Parameters.AddWithValue("@DepartmentName", department.DepartmentName);
                 cmd.Parameters.AddWithValue("@ParentDepartmentID", (object)department.ParentDepartmentID ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@IsActive", department.IsActive);
-                
+
                 conn.Open();
                 cmd.ExecuteNonQuery();
             }

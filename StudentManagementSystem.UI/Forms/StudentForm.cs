@@ -37,7 +37,7 @@ namespace StudentManagementSystem.UI.Forms
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error loading students: {ex.Message}", "Error", 
+                MessageBox.Show($"Error loading students: {ex.Message}", "Error",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
@@ -67,7 +67,7 @@ namespace StudentManagementSystem.UI.Forms
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error loading student details: {ex.Message}", "Error", 
+                MessageBox.Show($"Error loading student details: {ex.Message}", "Error",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
@@ -88,14 +88,14 @@ namespace StudentManagementSystem.UI.Forms
                 };
 
                 _studentService.AddStudent(student);
-                MessageBox.Show("Student added successfully!", "Success", 
+                MessageBox.Show("Student added successfully!", "Success",
                     MessageBoxButtons.OK, MessageBoxIcon.Information);
                 LoadStudents();
                 ClearForm();
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error adding student: {ex.Message}", "Error", 
+                MessageBox.Show($"Error adding student: {ex.Message}", "Error",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
@@ -104,7 +104,7 @@ namespace StudentManagementSystem.UI.Forms
         {
             if (!_selectedStudentId.HasValue)
             {
-                MessageBox.Show("Please select a student to update.", "Validation", 
+                MessageBox.Show("Please select a student to update.", "Validation",
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
@@ -124,13 +124,13 @@ namespace StudentManagementSystem.UI.Forms
                 };
 
                 _studentService.UpdateStudent(student);
-                MessageBox.Show("Student updated successfully!", "Success", 
+                MessageBox.Show("Student updated successfully!", "Success",
                     MessageBoxButtons.OK, MessageBoxIcon.Information);
                 LoadStudents();
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error updating student: {ex.Message}", "Error", 
+                MessageBox.Show($"Error updating student: {ex.Message}", "Error",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
@@ -139,13 +139,13 @@ namespace StudentManagementSystem.UI.Forms
         {
             if (!_selectedStudentId.HasValue)
             {
-                MessageBox.Show("Please select a student to delete.", "Validation", 
+                MessageBox.Show("Please select a student to delete.", "Validation",
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
             var result = MessageBox.Show(
-                "Are you sure you want to delete this student? (Uses INSTEAD OF trigger - sets to Inactive)", 
+                "Are you sure you want to delete this student? (Uses INSTEAD OF trigger - sets to Inactive)",
                 "Confirm Delete", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
 
             if (result == DialogResult.Yes)
@@ -153,14 +153,14 @@ namespace StudentManagementSystem.UI.Forms
                 try
                 {
                     _studentService.DeleteStudent(_selectedStudentId.Value);
-                    MessageBox.Show("Student deleted (set to Inactive)!", "Success", 
+                    MessageBox.Show("Student deleted (set to Inactive)!", "Success",
                         MessageBoxButtons.OK, MessageBoxIcon.Information);
                     LoadStudents();
                     ClearForm();
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"Error deleting student: {ex.Message}", "Error", 
+                    MessageBox.Show($"Error deleting student: {ex.Message}", "Error",
                         MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             }
@@ -170,7 +170,7 @@ namespace StudentManagementSystem.UI.Forms
         {
             if (!_selectedStudentId.HasValue)
             {
-                MessageBox.Show("Please select a student.", "Validation", 
+                MessageBox.Show("Please select a student.", "Validation",
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
@@ -186,12 +186,12 @@ namespace StudentManagementSystem.UI.Forms
                     message += $"{record.CourseCode} - {record.CourseTitle}: {record.Grade}\n";
                 }
 
-                MessageBox.Show(message, "Student Transcript", 
+                MessageBox.Show(message, "Student Transcript",
                     MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error loading transcript: {ex.Message}", "Error", 
+                MessageBox.Show($"Error loading transcript: {ex.Message}", "Error",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
@@ -208,7 +208,7 @@ namespace StudentManagementSystem.UI.Forms
             {
                 var searchText = txtSearch.Text.Trim().ToLower();
                 var students = _studentService.GetAllStudents()
-                    .Where(s => s.FirstName.ToLower().Contains(searchText) || 
+                    .Where(s => s.FirstName.ToLower().Contains(searchText) ||
                                 s.LastName.ToLower().Contains(searchText) ||
                                 s.Email.ToLower().Contains(searchText))
                     .ToList();
@@ -224,7 +224,7 @@ namespace StudentManagementSystem.UI.Forms
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error searching students: {ex.Message}", "Error", 
+                MessageBox.Show($"Error searching students: {ex.Message}", "Error",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
@@ -243,7 +243,7 @@ namespace StudentManagementSystem.UI.Forms
         {
             if (string.IsNullOrWhiteSpace(txtFirstName.Text))
             {
-                MessageBox.Show("First name is required.", "Validation", 
+                MessageBox.Show("First name is required.", "Validation",
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 txtFirstName.Focus();
                 return false;
@@ -251,7 +251,7 @@ namespace StudentManagementSystem.UI.Forms
 
             if (string.IsNullOrWhiteSpace(txtLastName.Text))
             {
-                MessageBox.Show("Last name is required.", "Validation", 
+                MessageBox.Show("Last name is required.", "Validation",
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 txtLastName.Focus();
                 return false;
@@ -259,7 +259,7 @@ namespace StudentManagementSystem.UI.Forms
 
             if (string.IsNullOrWhiteSpace(txtEmail.Text) || !txtEmail.Text.Contains("@"))
             {
-                MessageBox.Show("Valid email is required.", "Validation", 
+                MessageBox.Show("Valid email is required.", "Validation",
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 txtEmail.Focus();
                 return false;
@@ -267,7 +267,7 @@ namespace StudentManagementSystem.UI.Forms
 
             if (string.IsNullOrWhiteSpace(cmbStatus.Text))
             {
-                MessageBox.Show("Enrollment status is required.", "Validation", 
+                MessageBox.Show("Enrollment status is required.", "Validation",
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 cmbStatus.Focus();
                 return false;

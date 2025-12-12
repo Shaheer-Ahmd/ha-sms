@@ -76,11 +76,11 @@ namespace StudentManagementSystem.BLL.StoredProcedureImplementation
                     UPDATE Enrollments 
                     SET Grade = @Grade
                     WHERE EnrollmentID = @EnrollmentID AND EnrollmentDate = @EnrollmentDate", conn);
-                
+
                 cmd.Parameters.AddWithValue("@EnrollmentID", enrollment.EnrollmentID);
                 cmd.Parameters.AddWithValue("@EnrollmentDate", enrollment.EnrollmentDate);
                 cmd.Parameters.AddWithValue("@Grade", (object)enrollment.Grade ?? DBNull.Value);
-                
+
                 conn.Open();
                 cmd.ExecuteNonQuery(); // Trigger fires here
             }
@@ -264,12 +264,12 @@ namespace StudentManagementSystem.BLL.StoredProcedureImplementation
                 var cmd = new SqlCommand(@"
                     INSERT INTO CourseOfferings (CourseID, SemesterID, MaxCapacity, CurrentEnrollment)
                     VALUES (@CourseID, @SemesterID, @MaxCapacity, @CurrentEnrollment)", conn);
-                
+
                 cmd.Parameters.AddWithValue("@CourseID", offering.CourseID);
                 cmd.Parameters.AddWithValue("@SemesterID", offering.SemesterID);
                 cmd.Parameters.AddWithValue("@MaxCapacity", offering.MaxCapacity);
                 cmd.Parameters.AddWithValue("@CurrentEnrollment", offering.CurrentEnrollment);
-                
+
                 conn.Open();
                 cmd.ExecuteNonQuery();
             }
@@ -284,13 +284,13 @@ namespace StudentManagementSystem.BLL.StoredProcedureImplementation
                     SET CourseID = @CourseID, SemesterID = @SemesterID, 
                         MaxCapacity = @MaxCapacity, CurrentEnrollment = @CurrentEnrollment
                     WHERE OfferingID = @OfferingID", conn);
-                
+
                 cmd.Parameters.AddWithValue("@OfferingID", offering.OfferingID);
                 cmd.Parameters.AddWithValue("@CourseID", offering.CourseID);
                 cmd.Parameters.AddWithValue("@SemesterID", offering.SemesterID);
                 cmd.Parameters.AddWithValue("@MaxCapacity", offering.MaxCapacity);
                 cmd.Parameters.AddWithValue("@CurrentEnrollment", offering.CurrentEnrollment);
-                
+
                 conn.Open();
                 cmd.ExecuteNonQuery();
             }
@@ -306,14 +306,14 @@ namespace StudentManagementSystem.BLL.StoredProcedureImplementation
                 cmd.ExecuteNonQuery();
             }
         }
-public List<AuditGradeChange> GetGradeAuditLog()
-{
-    var result = new List<AuditGradeChange>();
+        public List<AuditGradeChange> GetGradeAuditLog()
+        {
+            var result = new List<AuditGradeChange>();
 
-    using (var conn = new SqlConnection(_connectionString))
-    using (var cmd = conn.CreateCommand())
-    {
-        cmd.CommandText = @"
+            using (var conn = new SqlConnection(_connectionString))
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.CommandText = @"
             SELECT TOP 1000
                 a.AuditID,
                 a.EnrollmentID,
@@ -324,27 +324,27 @@ public List<AuditGradeChange> GetGradeAuditLog()
             FROM dbo.Audit_GradeChanges AS a
             ORDER BY a.ChangeDate DESC;";
 
-        conn.Open();
-        using (var reader = cmd.ExecuteReader())
-        {
-            while (reader.Read())
-            {
-                var audit = new AuditGradeChange
+                conn.Open();
+                using (var reader = cmd.ExecuteReader())
                 {
-                    AuditID        = (int)reader["AuditID"],
-                    EnrollmentID   = (int)reader["EnrollmentID"],
-                    EnrollmentDate = (DateTime)reader["EnrollmentDate"],
-                    OldGrade       = reader["OldGrade"] as string,
-                    NewGrade       = reader["NewGrade"] as string,
-                    ChangeDate     = (DateTime)reader["ChangeDate"]
-                };
+                    while (reader.Read())
+                    {
+                        var audit = new AuditGradeChange
+                        {
+                            AuditID = (int)reader["AuditID"],
+                            EnrollmentID = (int)reader["EnrollmentID"],
+                            EnrollmentDate = (DateTime)reader["EnrollmentDate"],
+                            OldGrade = reader["OldGrade"] as string,
+                            NewGrade = reader["NewGrade"] as string,
+                            ChangeDate = (DateTime)reader["ChangeDate"]
+                        };
 
-                result.Add(audit);
+                        result.Add(audit);
+                    }
+                }
             }
-        }
-    }
 
-    return result;
-}
+            return result;
+        }
     }
 }

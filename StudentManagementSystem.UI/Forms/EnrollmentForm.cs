@@ -36,7 +36,7 @@ namespace StudentManagementSystem.UI.Forms
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error loading students: {ex.Message}", "Error", 
+                MessageBox.Show($"Error loading students: {ex.Message}", "Error",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
@@ -56,7 +56,7 @@ namespace StudentManagementSystem.UI.Forms
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error loading semesters: {ex.Message}", "Error", 
+                MessageBox.Show($"Error loading semesters: {ex.Message}", "Error",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
@@ -95,7 +95,7 @@ namespace StudentManagementSystem.UI.Forms
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error loading course offerings: {ex.Message}", "Error", 
+                MessageBox.Show($"Error loading course offerings: {ex.Message}", "Error",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
@@ -123,7 +123,7 @@ namespace StudentManagementSystem.UI.Forms
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error loading enrollments: {ex.Message}", "Error", 
+                MessageBox.Show($"Error loading enrollments: {ex.Message}", "Error",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
@@ -132,14 +132,14 @@ namespace StudentManagementSystem.UI.Forms
         {
             if (cmbStudent.SelectedValue == null || !(cmbStudent.SelectedValue is int))
             {
-                MessageBox.Show("Please select a student.", "Validation", 
+                MessageBox.Show("Please select a student.", "Validation",
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
             if (dgvOfferings.SelectedRows.Count == 0)
             {
-                MessageBox.Show("Please select a course offering.", "Validation", 
+                MessageBox.Show("Please select a course offering.", "Validation",
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
@@ -151,16 +151,16 @@ namespace StudentManagementSystem.UI.Forms
 
                 // Uses sp_RegisterStudentForCourse stored procedure
                 _enrollmentService.RegisterStudentForCourse(studentId, offeringId);
-                
-                MessageBox.Show("Student registered successfully!", 
+
+                MessageBox.Show("Student registered successfully!",
                     "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                
+
                 LoadAvailableOfferings((int)cmbSemester.SelectedValue);
                 LoadStudentEnrollments(studentId);
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Registration failed: {ex.Message}", "Error", 
+                MessageBox.Show($"Registration failed: {ex.Message}", "Error",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
@@ -169,14 +169,14 @@ namespace StudentManagementSystem.UI.Forms
         {
             if (dgvEnrollments.SelectedRows.Count == 0)
             {
-                MessageBox.Show("Please select an enrollment to update.", "Validation", 
+                MessageBox.Show("Please select an enrollment to update.", "Validation",
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
             if (string.IsNullOrEmpty(cmbGrade.Text))
             {
-                MessageBox.Show("Please select a grade.", "Validation", 
+                MessageBox.Show("Please select a grade.", "Validation",
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
@@ -190,19 +190,19 @@ namespace StudentManagementSystem.UI.Forms
                 if (enrollment != null)
                 {
                     enrollment.Grade = cmbGrade.Text;
-                    
+
                     // Triggers AFTER UPDATE trigger (trg_After_GradeUpdate) - audit trail
                     _enrollmentService.UpdateEnrollment(enrollment);
-                    
-                    MessageBox.Show("Grade updated successfully! (Triggered trg_After_GradeUpdate for audit)", 
+
+                    MessageBox.Show("Grade updated successfully! (Triggered trg_After_GradeUpdate for audit)",
                         "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    
+
                     LoadStudentEnrollments((int)cmbStudent.SelectedValue);
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error updating grade: {ex.Message}", "Error", 
+                MessageBox.Show($"Error updating grade: {ex.Message}", "Error",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }

@@ -13,7 +13,7 @@ namespace StudentManagementSystem.BLL.Interfaces
         void AddStudent(Student student);
         void UpdateStudent(Student student);
         void DeleteStudent(int studentId); // Uses INSTEAD OF trigger
-        
+
         // Business logic operations
         List<Student> GetActiveStudents();
         List<Student> SearchStudents(string searchTerm);

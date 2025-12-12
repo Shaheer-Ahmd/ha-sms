@@ -11,7 +11,7 @@ namespace StudentManagementSystem.BLL.Interfaces
         void AddSemester(Semester semester);
         void UpdateSemester(Semester semester);
         void DeleteSemester(int semesterId);
-        
+
         // Business logic
         Semester GetCurrentSemester();
         List<Semester> GetRecentSemesters(int count);

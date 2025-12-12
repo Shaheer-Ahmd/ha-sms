@@ -34,7 +34,7 @@ namespace StudentManagementSystem.UI.Forms
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error loading departments: {ex.Message}", "Error", 
+                MessageBox.Show($"Error loading departments: {ex.Message}", "Error",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
@@ -55,62 +55,62 @@ namespace StudentManagementSystem.UI.Forms
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error loading courses: {ex.Message}", "Error", 
+                MessageBox.Show($"Error loading courses: {ex.Message}", "Error",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
-private void LoadPrerequisites(int courseId)
-{
-    try
-    {
-        var prereqs = _courseService.GetCoursePrerequisites(courseId);
-
-        dgvPrerequisites.DataSource = prereqs
-            .Select(cp => new
+        private void LoadPrerequisites(int courseId)
+        {
+            try
             {
-                cp.PrerequisiteCourseID,
-                CourseCode = cp.PrerequisiteCourse.CourseCode,
-                Title = cp.PrerequisiteCourse.Title
-            })
-            .ToList();
-    }
-    catch (Exception ex)
-    {
-        var msg = "Error loading prerequisites: " + ex.Message;
-        if (ex.InnerException != null)
-        {
-            msg += Environment.NewLine + Environment.NewLine +
-                   "Inner exception: " + ex.InnerException.Message;
+                var prereqs = _courseService.GetCoursePrerequisites(courseId);
+
+                dgvPrerequisites.DataSource = prereqs
+                    .Select(cp => new
+                    {
+                        cp.PrerequisiteCourseID,
+                        CourseCode = cp.PrerequisiteCourse.CourseCode,
+                        Title = cp.PrerequisiteCourse.Title
+                    })
+                    .ToList();
+            }
+            catch (Exception ex)
+            {
+                var msg = "Error loading prerequisites: " + ex.Message;
+                if (ex.InnerException != null)
+                {
+                    msg += Environment.NewLine + Environment.NewLine +
+                           "Inner exception: " + ex.InnerException.Message;
+                }
+
+                MessageBox.Show(msg, "Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
-        MessageBox.Show(msg, "Error",
-            MessageBoxButtons.OK, MessageBoxIcon.Error);
-    }
-}
 
-
-private void LoadPrerequisiteCandidates(int courseId)
-{
-    try
-    {
-        var candidates = _courseService.GetAvailablePrerequisiteCourses(courseId);
-
-        cmbPrerequisiteCourse.DataSource = candidates;
-        cmbPrerequisiteCourse.DisplayMember = "CourseCode"; // or "Title" if you prefer
-        cmbPrerequisiteCourse.ValueMember = "CourseID";
-
-        if (candidates.Count == 0)
+        private void LoadPrerequisiteCandidates(int courseId)
         {
-            cmbPrerequisiteCourse.Text = string.Empty;
+            try
+            {
+                var candidates = _courseService.GetAvailablePrerequisiteCourses(courseId);
+
+                cmbPrerequisiteCourse.DataSource = candidates;
+                cmbPrerequisiteCourse.DisplayMember = "CourseCode"; // or "Title" if you prefer
+                cmbPrerequisiteCourse.ValueMember = "CourseID";
+
+                if (candidates.Count == 0)
+                {
+                    cmbPrerequisiteCourse.Text = string.Empty;
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error loading available prerequisite courses: {ex.Message}", "Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
-    }
-    catch (Exception ex)
-    {
-        MessageBox.Show($"Error loading available prerequisite courses: {ex.Message}", "Error",
-            MessageBoxButtons.OK, MessageBoxIcon.Error);
-    }
-}
 
 
         private void dgvCourses_SelectionChanged(object sender, EventArgs e)
@@ -140,90 +140,90 @@ private void LoadPrerequisiteCandidates(int courseId)
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error loading course details: {ex.Message}", "Error", 
+                MessageBox.Show($"Error loading course details: {ex.Message}", "Error",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
         private void btnAddPrerequisite_Click(object sender, EventArgs e)
-{
-    if (!_selectedCourseId.HasValue)
-    {
-        MessageBox.Show("Please select a course first.", "Validation",
-            MessageBoxButtons.OK, MessageBoxIcon.Warning);
-        return;
-    }
+        {
+            if (!_selectedCourseId.HasValue)
+            {
+                MessageBox.Show("Please select a course first.", "Validation",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
 
-    if (cmbPrerequisiteCourse.SelectedItem == null)
-    {
-        MessageBox.Show("Please select a course to add as a prerequisite.", "Validation",
-            MessageBoxButtons.OK, MessageBoxIcon.Warning);
-        return;
-    }
+            if (cmbPrerequisiteCourse.SelectedItem == null)
+            {
+                MessageBox.Show("Please select a course to add as a prerequisite.", "Validation",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
 
-    var courseId = _selectedCourseId.Value;
-    var prereqId = (int)cmbPrerequisiteCourse.SelectedValue;
+            var courseId = _selectedCourseId.Value;
+            var prereqId = (int)cmbPrerequisiteCourse.SelectedValue;
 
-    if (courseId == prereqId)
-    {
-        MessageBox.Show("A course cannot be its own prerequisite.", "Validation",
-            MessageBoxButtons.OK, MessageBoxIcon.Warning);
-        return;
-    }
+            if (courseId == prereqId)
+            {
+                MessageBox.Show("A course cannot be its own prerequisite.", "Validation",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
 
-    try
-    {
-        _courseService.AddCoursePrerequisite(courseId, prereqId);
-        LoadPrerequisites(courseId);
-        LoadPrerequisiteCandidates(courseId);
-    }
-    catch (Exception ex)
-    {
-        MessageBox.Show($"Error adding prerequisite: {ex.Message}", "Error",
-            MessageBoxButtons.OK, MessageBoxIcon.Error);
-    }
-}
+            try
+            {
+                _courseService.AddCoursePrerequisite(courseId, prereqId);
+                LoadPrerequisites(courseId);
+                LoadPrerequisiteCandidates(courseId);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error adding prerequisite: {ex.Message}", "Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
 
-private void btnRemovePrerequisite_Click(object sender, EventArgs e)
-{
-    if (!_selectedCourseId.HasValue)
-    {
-        MessageBox.Show("Please select a course first.", "Validation",
-            MessageBoxButtons.OK, MessageBoxIcon.Warning);
-        return;
-    }
+        private void btnRemovePrerequisite_Click(object sender, EventArgs e)
+        {
+            if (!_selectedCourseId.HasValue)
+            {
+                MessageBox.Show("Please select a course first.", "Validation",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
 
-    if (dgvPrerequisites.SelectedRows.Count == 0)
-    {
-        MessageBox.Show("Please select a prerequisite to remove.", "Validation",
-            MessageBoxButtons.OK, MessageBoxIcon.Warning);
-        return;
-    }
+            if (dgvPrerequisites.SelectedRows.Count == 0)
+            {
+                MessageBox.Show("Please select a prerequisite to remove.", "Validation",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
 
-    var courseId = _selectedCourseId.Value;
-    var prereqId = (int)dgvPrerequisites.SelectedRows[0].Cells["PrerequisiteCourseID"].Value;
+            var courseId = _selectedCourseId.Value;
+            var prereqId = (int)dgvPrerequisites.SelectedRows[0].Cells["PrerequisiteCourseID"].Value;
 
-    var confirm = MessageBox.Show(
-        "Are you sure you want to remove this prerequisite?",
-        "Confirm",
-        MessageBoxButtons.YesNo,
-        MessageBoxIcon.Question);
+            var confirm = MessageBox.Show(
+                "Are you sure you want to remove this prerequisite?",
+                "Confirm",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Question);
 
-    if (confirm != DialogResult.Yes)
-        return;
+            if (confirm != DialogResult.Yes)
+                return;
 
-    try
-    {
-        _courseService.RemoveCoursePrerequisite(courseId, prereqId);
-        LoadPrerequisites(courseId);
-        LoadPrerequisiteCandidates(courseId);
-    }
-    catch (Exception ex)
-    {
-        MessageBox.Show($"Error removing prerequisite: {ex.Message}", "Error",
-            MessageBoxButtons.OK, MessageBoxIcon.Error);
-    }
-}
+            try
+            {
+                _courseService.RemoveCoursePrerequisite(courseId, prereqId);
+                LoadPrerequisites(courseId);
+                LoadPrerequisiteCandidates(courseId);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error removing prerequisite: {ex.Message}", "Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
 
 
         private void btnAdd_Click(object sender, EventArgs e)
@@ -242,14 +242,14 @@ private void btnRemovePrerequisite_Click(object sender, EventArgs e)
                 };
 
                 _courseService.AddCourse(course);
-                MessageBox.Show("Course added successfully!", "Success", 
+                MessageBox.Show("Course added successfully!", "Success",
                     MessageBoxButtons.OK, MessageBoxIcon.Information);
                 LoadCourses();
                 ClearForm();
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error adding course: {ex.Message}", "Error", 
+                MessageBox.Show($"Error adding course: {ex.Message}", "Error",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
@@ -258,7 +258,7 @@ private void btnRemovePrerequisite_Click(object sender, EventArgs e)
         {
             if (!_selectedCourseId.HasValue)
             {
-                MessageBox.Show("Please select a course to update.", "Validation", 
+                MessageBox.Show("Please select a course to update.", "Validation",
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
@@ -278,13 +278,13 @@ private void btnRemovePrerequisite_Click(object sender, EventArgs e)
                 };
 
                 _courseService.UpdateCourse(course);
-                MessageBox.Show("Course updated successfully!", "Success", 
+                MessageBox.Show("Course updated successfully!", "Success",
                     MessageBoxButtons.OK, MessageBoxIcon.Information);
                 LoadCourses();
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error updating course: {ex.Message}", "Error", 
+                MessageBox.Show($"Error updating course: {ex.Message}", "Error",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
@@ -293,12 +293,12 @@ private void btnRemovePrerequisite_Click(object sender, EventArgs e)
         {
             if (!_selectedCourseId.HasValue)
             {
-                MessageBox.Show("Please select a course to delete.", "Validation", 
+                MessageBox.Show("Please select a course to delete.", "Validation",
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
-            var result = MessageBox.Show("Are you sure you want to delete this course?", 
+            var result = MessageBox.Show("Are you sure you want to delete this course?",
                 "Confirm Delete", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
 
             if (result == DialogResult.Yes)
@@ -306,14 +306,14 @@ private void btnRemovePrerequisite_Click(object sender, EventArgs e)
                 try
                 {
                     _courseService.DeleteCourse(_selectedCourseId.Value);
-                    MessageBox.Show("Course deleted successfully!", "Success", 
+                    MessageBox.Show("Course deleted successfully!", "Success",
                         MessageBoxButtons.OK, MessageBoxIcon.Information);
                     LoadCourses();
                     ClearForm();
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"Error deleting course: {ex.Message}", "Error", 
+                    MessageBox.Show($"Error deleting course: {ex.Message}", "Error",
                         MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             }
@@ -328,7 +328,7 @@ private void btnRemovePrerequisite_Click(object sender, EventArgs e)
         {
             if (string.IsNullOrWhiteSpace(txtCourseCode.Text))
             {
-                MessageBox.Show("Course code is required.", "Validation", 
+                MessageBox.Show("Course code is required.", "Validation",
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 txtCourseCode.Focus();
                 return false;
@@ -336,7 +336,7 @@ private void btnRemovePrerequisite_Click(object sender, EventArgs e)
 
             if (string.IsNullOrWhiteSpace(txtTitle.Text))
             {
-                MessageBox.Show("Title is required.", "Validation", 
+                MessageBox.Show("Title is required.", "Validation",
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 txtTitle.Focus();
                 return false;
@@ -344,7 +344,7 @@ private void btnRemovePrerequisite_Click(object sender, EventArgs e)
 
             if (numCredits.Value < 1 || numCredits.Value > 6)
             {
-                MessageBox.Show("Credits must be between 1 and 6.", "Validation", 
+                MessageBox.Show("Credits must be between 1 and 6.", "Validation",
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 numCredits.Focus();
                 return false;

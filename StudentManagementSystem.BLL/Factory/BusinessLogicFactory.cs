@@ -14,7 +14,7 @@ namespace StudentManagementSystem.BLL.Factory
         public BusinessLogicFactory(BLLImplementationType implementationType, string connectionString = null)
         {
             _implementationType = implementationType;
-            
+
             if (!string.IsNullOrEmpty(connectionString))
             {
                 _connectionString = connectionString;
@@ -37,7 +37,7 @@ namespace StudentManagementSystem.BLL.Factory
             {
                 var builder = new ConfigurationBuilder()
                     .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true);
-                
+
                 var config = builder.Build();
                 return config?.GetConnectionString("StudentManagementDB");
             }

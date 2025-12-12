@@ -74,13 +74,13 @@ namespace StudentManagementSystem.BLL.StoredProcedureImplementation
                 var cmd = new SqlCommand(@"
                     INSERT INTO StudentHolds (StudentID, HoldType, Reason, DateApplied, IsActive)
                     VALUES (@StudentID, @HoldType, @Reason, @DateApplied, @IsActive)", conn);
-                
+
                 cmd.Parameters.AddWithValue("@StudentID", hold.StudentID);
                 cmd.Parameters.AddWithValue("@HoldType", hold.HoldType);
                 cmd.Parameters.AddWithValue("@Reason", (object)hold.Reason ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@DateApplied", hold.DateApplied);
                 cmd.Parameters.AddWithValue("@IsActive", hold.IsActive);
-                
+
                 conn.Open();
                 cmd.ExecuteNonQuery();
             }
@@ -95,14 +95,14 @@ namespace StudentManagementSystem.BLL.StoredProcedureImplementation
                     SET StudentID = @StudentID, HoldType = @HoldType, Reason = @Reason, 
                         DateApplied = @DateApplied, IsActive = @IsActive
                     WHERE HoldID = @HoldID", conn);
-                
+
                 cmd.Parameters.AddWithValue("@HoldID", hold.HoldID);
                 cmd.Parameters.AddWithValue("@StudentID", hold.StudentID);
                 cmd.Parameters.AddWithValue("@HoldType", hold.HoldType);
                 cmd.Parameters.AddWithValue("@Reason", (object)hold.Reason ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@DateApplied", hold.DateApplied);
                 cmd.Parameters.AddWithValue("@IsActive", hold.IsActive);
-                
+
                 conn.Open();
                 cmd.ExecuteNonQuery();
             }
