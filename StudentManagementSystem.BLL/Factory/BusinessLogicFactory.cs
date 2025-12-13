@@ -44,7 +44,8 @@ namespace StudentManagementSystem.BLL.Factory
             catch
             {
                 // If configuration file is not available, use default
-                return "Server=localhost,1433;Database=StudentManagementDB;User Id=sa;Password=YourStrong!Passw0rd;TrustServerCertificate=True;";
+                // return "Server=localhost,1433;Database=StudentManagementDB;User Id=sa;Password=YourStrong!Passw0rd;TrustServerCertificate=True;";
+                return "Server=127.0.0.1,1433;Database=StudentManagementDB;User Id=sa;Password=YourStrong!Passw0rd;TrustServerCertificate=True;";
             }
         }
 

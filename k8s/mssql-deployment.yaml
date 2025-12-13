@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mssql-deployment
+spec:
+  replicas: 1
+  selector:
+     matchLabels:
+       app: mssql
+  template:
+    metadata:
+      labels:
+        app: mssql
+    spec:
+      terminationGracePeriodSeconds: 30
+      hostname: mssqlinst
+      securityContext:
+        runAsUser: 0
+        fsGroup: 0
+      initContainers:
+      - name: init-mssql
+        image: mcr.microsoft.com/mssql/server:2019-latest
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            mkdir -p /var/opt/mssql/data /var/opt/mssql/log
+            chown -R 0:0 /var/opt/mssql
+            chmod -R 755 /var/opt/mssql
+        volumeMounts:
+        - name: mssqldb
+          mountPath: /var/opt/mssql
+      containers:
+      - name: mssql
+        image: mcr.microsoft.com/mssql/server:2019-latest
+        resources:
+          requests:
+            memory: "2G"
+            cpu: "2000m"
+          limits:
+            memory: "2G"
+            cpu: "2000m"
+        ports:
+        - containerPort: 1433
+        env:
+        - name: MSSQL_PID
+          value: "Developer"
+        - name: ACCEPT_EULA
+          value: "Y"
+        - name: MSSQL_DATA_DIR
+          value: "/var/opt/mssql/data"
+        - name: MSSQL_LOG_DIR
+          value: "/var/opt/mssql/log"
+        - name: SA_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mssql-secret
+              key: SA_PASSWORD
+        volumeMounts:
+        - name: mssqldb
+          mountPath: /var/opt/mssql
+        livenessProbe:
+          tcpSocket:
+            port: 1433
+          initialDelaySeconds: 60
+          periodSeconds: 10
+        readinessProbe:
+          tcpSocket:
+            port: 1433
+          initialDelaySeconds: 30
+          periodSeconds: 10
+      volumes:
+      - name: mssqldb
+        persistentVolumeClaim:
+          claimName: mssql-pvc
