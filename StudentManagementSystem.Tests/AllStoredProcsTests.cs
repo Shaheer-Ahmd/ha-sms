@@ -8,8 +8,7 @@ namespace StudentManagementSystem.Tests
     public class AllStoredProceduresIntegrationTests
     {
         private const string ConnectionString =
-            // "Server=localhost,1433;Database=StudentManagementDB;User Id=SA;Password=YourPassword123!;TrustServerCertificate=True;";
-            "Server=127.0.0.1,1433;Database=StudentManagementDB;User Id=SA;Password=YourPassword123!;TrustServerCertificate=True;";
+            "Server=localhost,1433;Database=StudentManagementDB;User Id=SA;Password=YourPassword123!;TrustServerCertificate=True;";
 
         private SqlConnection GetConnection()
             => new SqlConnection(ConnectionString);

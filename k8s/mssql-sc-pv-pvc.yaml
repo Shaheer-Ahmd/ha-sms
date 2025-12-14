@@ -8,7 +8,7 @@ spec:
     storage: 2Gi
   accessModes:
     - ReadWriteOnce
-  persistentVolumeReclaimPolicy: Retain
+  persistentVolumeReclaimPolicy: Delete
   hostPath:
     path: "/run/desktop/mnt/host/c/k8s-data/mssql"
     type: DirectoryOrCreate
